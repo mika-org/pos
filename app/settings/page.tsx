@@ -1,0 +1,134 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { Save, Store, Calculator } from 'lucide-react';
+
+export default function SettingsPage() {
+  const { settings, updateSettings } = useSettingsStore();
+  const [formData, setFormData] = useState(settings);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync state if store updates from elsewhere
+  useEffect(() => {
+    setFormData(settings);
+  }, [settings]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value
+    }));
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    // Simulate network delay
+    setTimeout(() => {
+      updateSettings(formData);
+      setIsSaving(false);
+      alert('Pengaturan berhasil disimpan!');
+    }, 500);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Pengaturan</h1>
+        <p className="text-slate-500 text-sm">Kelola profil toko dan aturan pajak Anda di sini.</p>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Store Profile Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <Store className="text-blue-500" />
+            <h2 className="text-lg font-bold text-slate-800">Profil Toko</h2>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Nama Toko</label>
+                <input 
+                  type="text" 
+                  name="storeName"
+                  value={formData.storeName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Nomor Telepon</label>
+                <input 
+                  type="text" 
+                  name="storePhone"
+                  value={formData.storePhone}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Alamat Toko</label>
+              <input 
+                type="text" 
+                name="storeAddress"
+                value={formData.storeAddress}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tax Rules Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <Calculator className="text-emerald-500" />
+            <h2 className="text-lg font-bold text-slate-800">Pengaturan Pajak</h2>
+          </div>
+          
+          <div className="p-6">
+            <div className="max-w-md space-y-2">
+              <label className="text-sm font-medium text-slate-700">Pajak Penjualan (%)</label>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  name="taxPercentage"
+                  min="0"
+                  max="100"
+                  value={formData.taxPercentage}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-8"
+                  required
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 font-medium">%</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Pajak ini akan otomatis ditambahkan ke total belanja pelanggan saat checkout.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button 
+            type="submit"
+            disabled={isSaving}
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+          >
+            <Save size={20} />
+            <span>{isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+}
+
+/* Base styles for print */
+@media print {
+  @page {
+    margin: 0;
+    size: 58mm auto;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #print-area, #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%; /* The physical width is controlled by @page size, so 100% takes full 58mm */
+    padding: 4mm; /* Add some padding so it doesn't cut off at the edges */
+    margin: 0;
+  }
+}
