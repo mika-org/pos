@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { Save, Store, Calculator } from 'lucide-react';
+import { Save, Store, Calculator, Database, Download, Cloud } from 'lucide-react';
+import { exportLocalDb, exportSupabaseDb } from '@/lib/backupUtils';
+import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettingsStore();
@@ -114,6 +116,54 @@ export default function SettingsPage() {
               <p className="text-xs text-slate-500 mt-1">
                 Pajak ini akan otomatis ditambahkan ke total belanja pelanggan saat checkout.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Backup Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <Database className="text-purple-500" />
+            <h2 className="text-lg font-bold text-slate-800">Database & Backup</h2>
+          </div>
+          
+          <div className="p-6">
+            <p className="text-sm text-slate-500 mb-6">Unduh cadangan (backup) data sistem dalam format JSON. Anda dapat membackup data yang tersimpan di perangkat lokal maupun data yang ada di server cloud (Supabase).</p>
+            
+            <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  const tid = toast.loading('Memproses backup lokal...');
+                  const res = await exportLocalDb();
+                  if (res.success) {
+                    toast.success('Backup lokal berhasil diunduh!', { id: tid });
+                  } else {
+                    toast.error(`Gagal: ${res.error}`, { id: tid });
+                  }
+                }}
+                className="flex flex-1 items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-medium transition-colors"
+              >
+                <Download size={18} />
+                <span>Backup Local DB (JSON)</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  const tid = toast.loading('Memproses backup server...');
+                  const res = await exportSupabaseDb();
+                  if (res.success) {
+                    toast.success('Backup server berhasil diunduh!', { id: tid });
+                  } else {
+                    toast.error(`Gagal: ${res.error}`, { id: tid });
+                  }
+                }}
+                className="flex flex-1 items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-medium transition-colors"
+              >
+                <Cloud size={18} />
+                <span>Backup Supabase DB (JSON)</span>
+              </button>
             </div>
           </div>
         </div>
