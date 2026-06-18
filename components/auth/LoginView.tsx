@@ -117,11 +117,7 @@ export function LoginView() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-100 text-center text-xs text-slate-500 space-y-1">
-            <p><strong>Demo Akun:</strong></p>
-            <p>Admin: admin@store.com / admin123</p>
-            <p>Kasir: kasir@store.com / kasir123</p>
-          </div>
+
         </div>
       </div>
     </div>
