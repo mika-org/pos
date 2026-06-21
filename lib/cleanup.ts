@@ -235,6 +235,43 @@ export const cleanDuplicates = async () => {
       }
     }
 
+    // 6. CLEAN USERS
+    const usersList = await db.users.toArray();
+    const userGroups: { [key: string]: typeof usersList } = {};
+    for (const u of usersList) {
+      const key = u.email.trim().toLowerCase();
+      if (!userGroups[key]) userGroups[key] = [];
+      userGroups[key].push(u);
+    }
+
+    for (const key in userGroups) {
+      const group = userGroups[key];
+      if (group.length > 1) {
+        console.log(`Found duplicate users for email "${key}":`, group);
+        group.sort((a, b) => {
+          const aIsStr = isUuidOrStringId(a.id);
+          const bIsStr = isUuidOrStringId(b.id);
+          if (aIsStr && !bIsStr) return -1;
+          if (!aIsStr && bIsStr) return 1;
+
+          if (a.synced && !b.synced) return -1;
+          if (!a.synced && b.synced) return 1;
+
+          return a.createdAt - b.createdAt;
+        });
+
+        const primaryUser = group[0];
+        const duplicates = group.slice(1);
+
+        for (const dup of duplicates) {
+          if (dup.id) {
+            await db.users.delete(dup.id);
+            console.log(`Deleted duplicate user "${dup.email}" (ID: ${dup.id}), kept ID: ${primaryUser.id}`);
+          }
+        }
+      }
+    }
+
     console.log('Local database duplicate cleanup completed successfully!');
   } catch (error) {
     console.error('Error occurred during duplicate cleanup:', error);
