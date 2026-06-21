@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
+import bcrypt from 'bcryptjs';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export function LoginView() {
@@ -18,41 +19,34 @@ export function LoginView() {
     setError('');
 
     try {
-      // Authenticate strictly online using Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      // Query user's actual profile (including role and name) from public.users table in Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error('Email atau password salah');
+      }
+
+      if (profile.deleted) {
+        throw new Error('Akun Anda telah dinonaktifkan');
+      }
+
+      // Verify bcrypt password hash
+      const isPasswordCorrect = bcrypt.compareSync(password, profile.password || '');
+      if (!isPasswordCorrect) {
+        throw new Error('Email atau password salah');
+      }
+
+      // Successful login
+      login({ 
+        id: profile.id, 
+        email: profile.email, 
+        role: (profile.role as 'admin' | 'kasir') || 'kasir', 
+        name: profile.name || 'User'
       });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data.user) {
-        // Query user's actual profile (including role and name) from public.users table in Supabase
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single();
-
-        if (profile && !profileError) {
-          login({ 
-            id: data.user.id, 
-            email: data.user.email || email, 
-            role: (profile.role as 'admin' | 'kasir') || 'kasir', 
-            name: profile.name || data.user.email?.split('@')[0] || 'User'
-          });
-        } else {
-          // Fallback if not found in public.users table (e.g. default Supabase admin account)
-          login({ 
-            id: data.user.id, 
-            email: data.user.email || email, 
-            role: 'admin', 
-            name: data.user.email?.split('@')[0] || 'User'
-          });
-        }
-      }
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {

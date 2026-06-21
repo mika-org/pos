@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Product, Transaction, TransactionItem } from '@/lib/db';
+import { Product, Category, Transaction, TransactionItem } from '@/lib/db';
 import { usePOSStore } from '@/stores/posStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Receipt } from '@/components/pos/Receipt';
-import { syncData } from '@/lib/sync';
+import { supabase } from '@/lib/supabase';
 import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode } from 'lucide-react';
 
 export default function POSPage() {
@@ -22,18 +21,46 @@ export default function POSPage() {
   const { settings } = useSettingsStore();
   const { user } = useAuthStore();
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Store actions
   const { cart, addToCart, removeFromCart, updateQty, getSubtotal, getTotal, clearCart } = usePOSStore();
 
   const finalTotal = getTotal() + (getTotal() * (settings.taxPercentage / 100));
 
-  // Queries
-  const categories = useLiveQuery(() => db.categories.filter(c => !c.deleted).toArray());
-  const allProducts = useLiveQuery(() => db.products.filter(p => !p.deleted).toArray());
+  const fetchMasterData = async () => {
+    setIsLoading(true);
+    try {
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('deleted', false);
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('deleted', false);
+
+      if (categoriesError) console.error(categoriesError);
+      if (productsError) console.error(productsError);
+
+      setCategories(categoriesData || []);
+      setAllProducts(productsData || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMasterData();
+  }, []);
 
   // Filter products based on search and category
   const products = allProducts?.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode.includes(searchQuery);
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.barcode && p.barcode.includes(searchQuery));
     const matchesCategory = activeCategory ? p.categoryId === activeCategory : true;
     return matchesSearch && matchesCategory;
   }) || [];
@@ -104,7 +131,9 @@ export default function POSPage() {
     }
 
     try {
+      const txId = crypto.randomUUID();
       const txData: Transaction = {
+        id: txId,
         no: `TRX-${Date.now()}`,
         date: Date.now(),
         subtotal: getSubtotal(),
@@ -118,30 +147,34 @@ export default function POSPage() {
         userId: user?.id,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        synced: false
       };
 
-      const txId = await db.transactions.add(txData);
+      const { error: txError } = await supabase.from('transactions').insert(txData);
+      if (txError) throw txError;
       
       const txItems: TransactionItem[] = [];
 
       // Save items
       for (const item of cart) {
-        const itemData: TransactionItem = {
-          transactionId: txId.toString(),
+        txItems.push({
+          id: crypto.randomUUID(),
+          transactionId: txId,
           productId: item.product.id!,
           productName: item.product.name,
           price: item.product.sellPrice,
           qty: item.qty,
           discount: item.discount,
           subtotal: item.subtotal
-        };
-        txItems.push(itemData);
-        await db.transactionItems.add(itemData);
-        
-        // Deduct stock
+        });
+      }
+
+      const { error: itemsError } = await supabase.from('transaction_items').insert(txItems);
+      if (itemsError) throw itemsError;
+      
+      // Deduct stock
+      for (const item of cart) {
         const newStock = item.product.stock - item.qty;
-        await db.products.update(item.product.id!, { stock: newStock });
+        await supabase.from('products').update({ stock: newStock, updatedAt: Date.now() }).eq('id', item.product.id);
       }
 
       setIsPaymentModalOpen(false);
@@ -149,11 +182,11 @@ export default function POSPage() {
       setAmountPaid('');
       
       // Set transaction for receipt and open success modal
-      setCompletedTransaction({ tx: { ...txData, id: txId.toString() }, items: txItems });
+      setCompletedTransaction({ tx: txData, items: txItems });
       setIsSuccessModalOpen(true);
 
-      // Trigger background sync
-      syncData(true);
+      // Refresh master data to update grid stock
+      await fetchMasterData();
     } catch (error) {
       console.error('Checkout failed:', error);
       alert('Terjadi kesalahan saat memproses transaksi');
@@ -164,7 +197,9 @@ export default function POSPage() {
     if (cart.length === 0) return;
     
     try {
-      const txId = await db.transactions.add({
+      const txId = crypto.randomUUID();
+      const txData: Transaction = {
+        id: txId,
         no: `HLD-${Date.now()}`,
         date: Date.now(),
         subtotal: getSubtotal(),
@@ -177,12 +212,16 @@ export default function POSPage() {
         status: 'hold',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        synced: false
-      });
+      };
 
+      const { error: txError } = await supabase.from('transactions').insert(txData);
+      if (txError) throw txError;
+
+      const txItems: TransactionItem[] = [];
       for (const item of cart) {
-        await db.transactionItems.add({
-          transactionId: txId.toString(),
+        txItems.push({
+          id: crypto.randomUUID(),
+          transactionId: txId,
           productId: item.product.id!,
           productName: item.product.name,
           price: item.product.sellPrice,
@@ -192,8 +231,12 @@ export default function POSPage() {
         });
       }
 
+      const { error: itemsError } = await supabase.from('transaction_items').insert(txItems);
+      if (itemsError) throw itemsError;
+
       clearCart();
       alert('Transaksi berhasil di-hold!');
+      await fetchMasterData();
     } catch (error) {
       console.error('Hold bill failed:', error);
       alert('Gagal hold transaksi');

@@ -1,19 +1,14 @@
 "use client";
 
-import { Bell, Search, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Bell, Search, Wifi, WifiOff } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { syncData } from '@/lib/sync';
 
 export function Header() {
   const [isOnline, setIsOnline] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncData(true); // Silent background sync when connection is restored
-    };
+    const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
@@ -24,13 +19,6 @@ export function Header() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  const handleManualSync = async () => {
-    if (!isOnline) return;
-    setIsSyncing(true);
-    await syncData();
-    setIsSyncing(false);
-  };
 
   return (
     <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 transition-all duration-300">
@@ -44,20 +32,6 @@ export function Header() {
       </div>
 
       <div className="flex items-center space-x-4">
-        {isOnline && (
-          <button 
-            onClick={handleManualSync}
-            disabled={isSyncing}
-            className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              isSyncing ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
-            }`}
-            title="Sync Data"
-          >
-            <RefreshCw size={14} className={`mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Menyinkronkan...' : 'Sync Now'}</span>
-          </button>
-        )}
-        
         <div className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
           {isOnline ? (
             <>

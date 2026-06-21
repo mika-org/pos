@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Save, Store, Calculator, Database, Download, Cloud, QrCode, UploadCloud, X } from 'lucide-react';
-import { exportLocalDb, exportSupabaseDb } from '@/lib/backupUtils';
+import { exportSupabaseDb } from '@/lib/backupUtils';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -199,26 +199,9 @@ export default function SettingsPage() {
           </div>
           
           <div className="p-6">
-            <p className="text-sm text-slate-500 mb-6">Unduh cadangan (backup) data sistem dalam format JSON. Anda dapat membackup data yang tersimpan di perangkat lokal maupun data yang ada di server cloud (Supabase).</p>
+            <p className="text-sm text-slate-500 mb-6">Unduh cadangan (backup) data sistem dalam format JSON langsung dari server cloud (Supabase).</p>
             
-            <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-              <button
-                type="button"
-                onClick={async () => {
-                  const tid = toast.loading('Memproses backup lokal...');
-                  const res = await exportLocalDb();
-                  if (res.success) {
-                    toast.success('Backup lokal berhasil diunduh!', { id: tid });
-                  } else {
-                    toast.error(`Gagal: ${res.error}`, { id: tid });
-                  }
-                }}
-                className="flex flex-1 items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-medium transition-colors"
-              >
-                <Download size={18} />
-                <span>Backup Local DB (JSON)</span>
-              </button>
-              
+            <div className="flex">
               <button
                 type="button"
                 onClick={async () => {

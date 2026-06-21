@@ -16,17 +16,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated) {
       fetchSettings();
     }
-
-    // Periodic Background Sync (every 5 minutes)
-    const syncInterval = setInterval(() => {
-      if (isAuthenticated && navigator.onLine) {
-        import('@/lib/sync').then(({ syncData }) => {
-          syncData(true);
-        });
-      }
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(syncInterval);
   }, [isAuthenticated]);
 
   // Avoid hydration mismatch by waiting for client-side render

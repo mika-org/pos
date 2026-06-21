@@ -1,15 +1,49 @@
 "use client";
 
 import { DollarSign, ShoppingBag, TrendingUp, AlertCircle } from 'lucide-react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { useState, useEffect } from 'react';
+import { Transaction, Product, TransactionItem } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { startOfDay, format, subDays } from 'date-fns';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export default function Dashboard() {
-  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
-  const products = useLiveQuery(() => db.products.toArray()) || [];
-  const items = useLiveQuery(() => db.transactionItems.toArray()) || [];
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [items, setItems] = useState<TransactionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('deleted', false);
+        
+        const { data: transactionsData } = await supabase
+          .from('transactions')
+          .select('*')
+          .gte('date', subDays(startOfDay(new Date()), 30).getTime());
+
+        const { data: itemsData } = await supabase
+          .from('transaction_items')
+          .select('*')
+          .limit(1000);
+
+        setProducts(productsData || []);
+        setTransactions(transactionsData || []);
+        setItems(itemsData || []);
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const today = startOfDay(new Date()).getTime();
 
@@ -55,6 +89,10 @@ export default function Dashboard() {
       name: format(date, 'dd MMM'),
       revenue: dayRevenue
     });
+  }
+
+  if (isLoading) {
+    return <div className="p-6 text-slate-500 font-medium">Memuat data dashboard...</div>;
   }
 
   return (

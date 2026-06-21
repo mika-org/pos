@@ -1,4 +1,3 @@
-import { db } from './db';
 import { supabase } from './supabase';
 
 const downloadFile = (data: any, filename: string) => {
@@ -11,29 +10,6 @@ const downloadFile = (data: any, filename: string) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-};
-
-export const exportLocalDb = async () => {
-  try {
-    const data: Record<string, any> = {};
-    
-    // List all tables we want to backup
-    const tables = ['users', 'products', 'categories', 'customers', 'suppliers', 'transactions', 'transactionItems'];
-    
-    for (const tableName of tables) {
-      if ((db as any)[tableName]) {
-        data[tableName] = await (db as any)[tableName].toArray();
-      }
-    }
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(data, `local_backup_${timestamp}.json`);
-    
-    return { success: true };
-  } catch (error: any) {
-    console.error("Local backup failed:", error);
-    return { success: false, error: error.message };
-  }
 };
 
 export const exportSupabaseDb = async () => {

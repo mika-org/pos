@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Product } from '@/lib/db';
-import { syncData } from '@/lib/sync';
+import { useState, useEffect } from 'react';
+import { Product, Category } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X, Image as ImageIcon } from 'lucide-react';
 
 export default function ProductsPage() {
@@ -21,19 +20,45 @@ export default function ProductsPage() {
     imageUrl: ''
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const products = useLiveQuery(
-    () => db.products
-      .filter(p => !p.deleted && (
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        p.barcode.includes(searchQuery)
-      ))
-      .reverse()
-      .sortBy('createdAt'),
-    [searchQuery]
-  );
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('deleted', false)
+        .order('createdAt', { ascending: false });
 
-  const categories = useLiveQuery(() => db.categories.filter(c => !c.deleted).toArray());
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('deleted', false);
+
+      if (productsError) console.error('Error fetching products:', productsError);
+      if (categoriesError) console.error('Error fetching categories:', categoriesError);
+
+      setProducts(productsData || []);
+      setCategories(categoriesData || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (p.barcode && p.barcode.includes(searchQuery));
+    return matchesSearch;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,21 +74,27 @@ export default function ProductsPage() {
         stock: Number(formData.stock),
         imageUrl: formData.imageUrl,
         updatedAt: Date.now(),
-        synced: false,
+        deleted: false,
       };
 
       if (editingId) {
-        await db.products.update(editingId, payload);
+        const { error } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        await db.products.add({
-          id: crypto.randomUUID(),
-          ...payload,
-          createdAt: Date.now(),
-          deleted: false,
-        });
+        const { error } = await supabase
+          .from('products')
+          .insert({
+            id: crypto.randomUUID(),
+            ...payload,
+            createdAt: Date.now()
+          });
+        if (error) throw error;
       }
       closeModal();
-      syncData(true);
+      await fetchData();
     } catch (error) {
       console.error('Failed to save product:', error);
       alert('Gagal menyimpan produk');
@@ -73,12 +104,15 @@ export default function ProductsPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
       try {
-        await db.products.update(id, {
-          deleted: true,
-          updatedAt: Date.now(),
-          synced: false
-        });
-        syncData(true);
+        const { error } = await supabase
+          .from('products')
+          .update({
+            deleted: true,
+            updatedAt: Date.now()
+          })
+          .eq('id', id);
+        if (error) throw error;
+        await fetchData();
       } catch (error) {
         console.error('Failed to delete product:', error);
       }
@@ -154,18 +188,20 @@ export default function ProductsPage() {
     if (!newCategoryName.trim()) return;
     try {
       const uuid = crypto.randomUUID();
-      await db.categories.add({
-        id: uuid,
-        name: newCategoryName,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        synced: false,
-        deleted: false
-      });
+      const { error } = await supabase
+        .from('categories')
+        .insert({
+          id: uuid,
+          name: newCategoryName,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          deleted: false
+        });
+      if (error) throw error;
       setFormData({ ...formData, categoryId: uuid });
       setIsCategoryModalOpen(false);
       setNewCategoryName('');
-      syncData(true);
+      await fetchData();
     } catch (err) {
       console.error(err);
       alert('Gagal menambah kategori');
@@ -219,16 +255,16 @@ export default function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {products === undefined ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-500">Memuat data...</td>
                 </tr>
-              ) : products.length === 0 ? (
+              ) : filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-500">Belum ada produk ditemukan</td>
                 </tr>
               ) : (
-                products.map((product) => (
+                filteredProducts.map((product) => (
                   <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center space-x-3">

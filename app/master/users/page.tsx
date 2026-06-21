@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, AppUser } from '@/lib/db';
-import { syncData } from '@/lib/sync';
+import { useState, useEffect } from 'react';
+import { AppUser } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { useAuthStore } from '@/stores/authStore';
 import { Plus, Search, Edit2, Trash2, Users, Shield, Key } from 'lucide-react';
@@ -22,10 +21,33 @@ export default function UsersPage() {
 
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'admin';
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const users = useLiveQuery(
-    () => db.users.filter(u => !u.deleted).toArray()
-  ) || [];
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('deleted', false)
+        .order('createdAt', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching users:', error);
+      } else {
+        setUsers(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -68,30 +90,35 @@ export default function UsersPage() {
       const hashedPassword = hashPasswordIfNeeded(formData.password);
 
       if (editingId) {
-        await db.users.update(editingId, {
-          name: formData.name,
-          email: formData.email,
-          password: hashedPassword,
-          role: formData.role,
-          updatedAt: Date.now(),
-          synced: false
-        });
+        const { error } = await supabase
+          .from('users')
+          .update({
+            name: formData.name,
+            email: formData.email,
+            password: hashedPassword,
+            role: formData.role,
+            updatedAt: Date.now()
+          })
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        await db.users.add({
-          id: crypto.randomUUID(),
-          name: formData.name,
-          email: formData.email,
-          password: hashedPassword,
-          role: formData.role,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          synced: false,
-          deleted: false
-        });
+        const { error } = await supabase
+          .from('users')
+          .insert({
+            id: crypto.randomUUID(),
+            name: formData.name,
+            email: formData.email,
+            password: hashedPassword,
+            role: formData.role,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            deleted: false
+          });
+        if (error) throw error;
       }
       setIsModalOpen(false);
       resetForm();
-      syncData(true);
+      await fetchUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
       alert('Gagal menyimpan pengguna');
@@ -102,12 +129,15 @@ export default function UsersPage() {
     if (!isAdmin) return;
     if (confirm('Yakin ingin menghapus pengguna ini?')) {
       try {
-        await db.users.update(id, {
-          deleted: true,
-          updatedAt: Date.now(),
-          synced: false
-        });
-        syncData(true);
+        const { error } = await supabase
+          .from('users')
+          .update({
+            deleted: true,
+            updatedAt: Date.now()
+          })
+          .eq('id', id);
+        if (error) throw error;
+        await fetchUsers();
       } catch (error) {
         console.error('Failed to delete user:', error);
       }
@@ -159,7 +189,13 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
                     Belum ada pengguna yang ditambahkan.

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Category } from '@/lib/db';
-import { syncData } from '@/lib/sync';
+import { useState, useEffect } from 'react';
+import { Category } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function CategoriesPage() {
@@ -11,14 +10,36 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch categories from IndexedDB reactively
-  const categories = useLiveQuery(
-    () => db.categories
-      .filter(cat => !cat.deleted && cat.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      .reverse()
-      .sortBy('createdAt'),
-    [searchQuery]
+  const fetchCategories = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('deleted', false)
+        .order('createdAt', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+      } else {
+        setCategories(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,24 +48,28 @@ export default function CategoriesPage() {
 
     try {
       if (editingId) {
-        await db.categories.update(editingId, {
-          name: formData.name,
-          updatedAt: Date.now(),
-          synced: false,
-        });
+        const { error } = await supabase
+          .from('categories')
+          .update({
+            name: formData.name,
+            updatedAt: Date.now(),
+          })
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        // Generate a secure UUID locally to avoid conflicts during synchronization
-        await db.categories.add({
-          id: crypto.randomUUID(),
-          name: formData.name,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          synced: false,
-          deleted: false,
-        });
+        const { error } = await supabase
+          .from('categories')
+          .insert({
+            id: crypto.randomUUID(),
+            name: formData.name,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            deleted: false,
+          });
+        if (error) throw error;
       }
       closeModal();
-      syncData(true);
+      await fetchCategories();
     } catch (error) {
       console.error('Failed to save category:', error);
       alert('Gagal menyimpan kategori');
@@ -54,13 +79,15 @@ export default function CategoriesPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus kategori ini?')) {
       try {
-        // Soft delete for offline sync support
-        await db.categories.update(id, {
-          deleted: true,
-          updatedAt: Date.now(),
-          synced: false
-        });
-        syncData(true);
+        const { error } = await supabase
+          .from('categories')
+          .update({
+            deleted: true,
+            updatedAt: Date.now()
+          })
+          .eq('id', id);
+        if (error) throw error;
+        await fetchCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
       }
@@ -123,16 +150,16 @@ export default function CategoriesPage() {
               </tr>
             </thead>
             <tbody>
-              {categories === undefined ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={2} className="p-8 text-center text-slate-500">Memuat data...</td>
                 </tr>
-              ) : categories.length === 0 ? (
+              ) : filteredCategories.length === 0 ? (
                 <tr>
                   <td colSpan={2} className="p-8 text-center text-slate-500">Belum ada kategori ditemukan</td>
                 </tr>
               ) : (
-                categories.map((category) => (
+                filteredCategories.map((category) => (
                   <tr key={category.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4 text-slate-800 font-medium">{category.name}</td>
                     <td className="p-4 flex justify-center space-x-2">

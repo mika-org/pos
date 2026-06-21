@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Transaction, TransactionItem } from '@/lib/db';
+import { useState, useEffect } from 'react';
+import { Transaction, TransactionItem } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { Search, Eye, FileText, X } from 'lucide-react';
 import { Receipt } from '@/components/pos/Receipt';
@@ -11,8 +11,32 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const transactions = useLiveQuery(() => db.transactions.reverse().toArray()) || [];
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+      } else {
+        setTransactions(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   const filteredTransactions = transactions.filter(tx => 
     tx.no.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -22,10 +46,19 @@ export default function HistoryPage() {
   const handleViewDetail = async (tx: Transaction) => {
     if (!tx.id) return;
     
-    // Fetch items for this transaction
-    const items = await db.transactionItems.where('transactionId').equals(tx.id.toString()).toArray();
-    setSelectedTx({ tx, items });
-    setIsDetailModalOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('transaction_items')
+        .select('*')
+        .eq('transactionId', tx.id);
+
+      if (error) throw error;
+
+      setSelectedTx({ tx, items: data || [] });
+      setIsDetailModalOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch transaction items:', error);
+    }
   };
 
   return (
@@ -62,7 +95,13 @@ export default function HistoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredTransactions.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    <p>Memuat data...</p>
+                  </td>
+                </tr>
+              ) : filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     <FileText size={32} className="mx-auto mb-3 opacity-20" />

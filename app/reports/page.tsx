@@ -1,24 +1,48 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { useState, useEffect } from 'react';
+import { Transaction } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { Download, Search, FileText, TrendingUp, Tag, Banknote } from 'lucide-react';
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-
-  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filter logic
   const startTs = startOfDay(new Date(startDate)).getTime();
   const endTs = endOfDay(new Date(endDate)).getTime();
 
-  const filteredTransactions = transactions
-    .filter(tx => tx.date >= startTs && tx.date <= endTs && tx.status === 'completed')
-    .sort((a, b) => b.date - a.date); // Newest first
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .gte('date', startTs)
+          .lte('date', endTs)
+          .eq('status', 'completed');
+
+        if (error) {
+          console.error('Error fetching transactions for reports:', error);
+        } else {
+          setTransactions(data || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [startDate, endDate]);
+
+  const filteredTransactions = [...transactions].sort((a, b) => b.date - a.date); // Newest first
 
   // Summary Metrics
   const totalRevenue = filteredTransactions.reduce((sum, tx) => sum + tx.total, 0);
@@ -138,7 +162,13 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredTransactions.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                     Tidak ada data transaksi pada rentang tanggal tersebut.

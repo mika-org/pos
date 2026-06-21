@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Customer } from '@/lib/db';
-import { syncData } from '@/lib/sync';
+import { useState, useEffect } from 'react';
+import { Customer } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -11,13 +10,36 @@ export default function CustomersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const customers = useLiveQuery(
-    () => db.customers
-      .filter(cust => !cust.deleted && cust.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      .reverse()
-      .sortBy('createdAt'),
-    [searchQuery]
+  const fetchCustomers = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('deleted', false)
+        .order('createdAt', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching customers:', error);
+      } else {
+        setCustomers(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const filteredCustomers = customers.filter(cust =>
+    cust.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,23 +48,28 @@ export default function CustomersPage() {
 
     try {
       if (editingId) {
-        await db.customers.update(editingId, {
-          ...formData,
-          updatedAt: Date.now(),
-          synced: false,
-        });
+        const { error } = await supabase
+          .from('customers')
+          .update({
+            ...formData,
+            updatedAt: Date.now(),
+          })
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        await db.customers.add({
-          id: crypto.randomUUID(),
-          ...formData,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          synced: false,
-          deleted: false,
-        });
+        const { error } = await supabase
+          .from('customers')
+          .insert({
+            id: crypto.randomUUID(),
+            ...formData,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            deleted: false,
+          });
+        if (error) throw error;
       }
       closeModal();
-      syncData(true);
+      await fetchCustomers();
     } catch (error) {
       console.error('Failed to save customer:', error);
       alert('Gagal menyimpan customer');
@@ -52,12 +79,15 @@ export default function CustomersPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus customer ini?')) {
       try {
-        await db.customers.update(id, {
-          deleted: true,
-          updatedAt: Date.now(),
-          synced: false
-        });
-        syncData(true);
+        const { error } = await supabase
+          .from('customers')
+          .update({
+            deleted: true,
+            updatedAt: Date.now()
+          })
+          .eq('id', id);
+        if (error) throw error;
+        await fetchCustomers();
       } catch (error) {
         console.error('Failed to delete customer:', error);
       }
@@ -122,16 +152,16 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {customers === undefined ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-slate-500">Memuat data...</td>
                 </tr>
-              ) : customers.length === 0 ? (
+              ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-slate-500">Belum ada customer ditemukan</td>
                 </tr>
               ) : (
-                customers.map((customer) => (
+                filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4 text-slate-800 font-medium">{customer.name}</td>
                     <td className="p-4 text-slate-600">{customer.phone || '-'}</td>

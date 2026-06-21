@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Supplier } from '@/lib/db';
-import { syncData } from '@/lib/sync';
+import { useState, useEffect } from 'react';
+import { Supplier } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function SuppliersPage() {
@@ -11,13 +10,36 @@ export default function SuppliersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const suppliers = useLiveQuery(
-    () => db.suppliers
-      .filter(sup => !sup.deleted && sup.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      .reverse()
-      .sortBy('createdAt'),
-    [searchQuery]
+  const fetchSuppliers = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('deleted', false)
+        .order('createdAt', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching suppliers:', error);
+      } else {
+        setSuppliers(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  const filteredSuppliers = suppliers.filter(sup =>
+    sup.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,23 +48,28 @@ export default function SuppliersPage() {
 
     try {
       if (editingId) {
-        await db.suppliers.update(editingId, {
-          ...formData,
-          updatedAt: Date.now(),
-          synced: false,
-        });
+        const { error } = await supabase
+          .from('suppliers')
+          .update({
+            ...formData,
+            updatedAt: Date.now(),
+          })
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        await db.suppliers.add({
-          id: crypto.randomUUID(),
-          ...formData,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          synced: false,
-          deleted: false,
-        });
+        const { error } = await supabase
+          .from('suppliers')
+          .insert({
+            id: crypto.randomUUID(),
+            ...formData,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            deleted: false,
+          });
+        if (error) throw error;
       }
       closeModal();
-      syncData(true);
+      await fetchSuppliers();
     } catch (error) {
       console.error('Failed to save supplier:', error);
       alert('Gagal menyimpan supplier');
@@ -52,12 +79,15 @@ export default function SuppliersPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
       try {
-        await db.suppliers.update(id, {
-          deleted: true,
-          updatedAt: Date.now(),
-          synced: false
-        });
-        syncData(true);
+        const { error } = await supabase
+          .from('suppliers')
+          .update({
+            deleted: true,
+            updatedAt: Date.now()
+          })
+          .eq('id', id);
+        if (error) throw error;
+        await fetchSuppliers();
       } catch (error) {
         console.error('Failed to delete supplier:', error);
       }
@@ -122,16 +152,16 @@ export default function SuppliersPage() {
               </tr>
             </thead>
             <tbody>
-              {suppliers === undefined ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-slate-500">Memuat data...</td>
                 </tr>
-              ) : suppliers.length === 0 ? (
+              ) : filteredSuppliers.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-slate-500">Belum ada supplier ditemukan</td>
                 </tr>
               ) : (
-                suppliers.map((supplier) => (
+                filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4 text-slate-800 font-medium">{supplier.name}</td>
                     <td className="p-4 text-slate-600">{supplier.phone || '-'}</td>
