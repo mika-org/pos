@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
-import { db } from '@/lib/db';
-import bcrypt from 'bcryptjs';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export function LoginView() {
@@ -20,39 +18,40 @@ export function LoginView() {
     setError('');
 
     try {
-      // Try Supabase auth first
+      // Authenticate strictly online using Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        // FALLBACK: Local DB Check
-        console.warn('Supabase Auth failed, checking local users...', error.message);
-        
-        // Auto-seed admin if no users exist
-        const userCount = await db.users.count();
-        if (userCount === 0 && (email === 'admin@store.com' || email === 'admin@admin.com') && password === 'admin123') {
-          // Reverted: Default admin remains in-memory only and is not written to the local database
-          login({ id: 'local-admin', email, role: 'admin', name: 'Admin Default' });
-          return;
-        }
+        throw error;
+      }
 
-        const localUser = await db.users.where('email').equals(email).first();
-        
-        if (localUser && localUser.password && bcrypt.compareSync(password, localUser.password) && !localUser.deleted) {
-          login({ id: localUser.id!.toString(), email, role: localUser.role, name: localUser.name });
+      if (data.user) {
+        // Query user's actual profile (including role and name) from public.users table in Supabase
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (profile && !profileError) {
+          login({ 
+            id: data.user.id, 
+            email: data.user.email || email, 
+            role: (profile.role as 'admin' | 'kasir') || 'kasir', 
+            name: profile.name || data.user.email?.split('@')[0] || 'User'
+          });
         } else {
-          throw new Error('Invalid credentials');
+          // Fallback if not found in public.users table (e.g. default Supabase admin account)
+          login({ 
+            id: data.user.id, 
+            email: data.user.email || email, 
+            role: 'admin', 
+            name: data.user.email?.split('@')[0] || 'User'
+          });
         }
-      } else if (data.user) {
-        // Assume successful supabase login (we might fetch role from a profile table later)
-        login({ 
-          id: data.user.id, 
-          email: data.user.email || email, 
-          role: 'admin', // Placeholder role for supabase user
-          name: data.user.email?.split('@')[0] || 'User'
-        });
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');
