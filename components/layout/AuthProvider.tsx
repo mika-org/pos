@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { LoginView } from '@/components/auth/LoginView';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const { fetchSettings } = useSettingsStore();
 
   useEffect(() => {
     setMounted(true);
+
+    if (isAuthenticated) {
+      fetchSettings();
+    }
 
     // Periodic Background Sync (every 5 minutes)
     const syncInterval = setInterval(() => {

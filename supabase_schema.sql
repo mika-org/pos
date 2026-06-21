@@ -96,7 +96,18 @@ CREATE TABLE public.users (
     deleted BOOLEAN DEFAULT FALSE
 );
 
--- Set Row Level Security (RLS) to PUBLIC for testing purpublices
+-- 8. Create Settings Table
+CREATE TABLE public.settings (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+    "storeName" TEXT NOT NULL DEFAULT 'POS System',
+    "storeAddress" TEXT NOT NULL DEFAULT 'Jl. Contoh Alamat No. 123',
+    "storePhone" TEXT NOT NULL DEFAULT '08123456789',
+    "taxPercentage" BIGINT NOT NULL DEFAULT 0,
+    "qrisImage" TEXT,
+    "updatedAt" BIGINT NOT NULL
+);
+
+-- Set Row Level Security (RLS) to PUBLIC for testing purposes
 -- WARNING: In a production environment, you MUST secure these tables using Supabase Auth policies
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -105,6 +116,7 @@ ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public access" ON public.categories FOR ALL USING (true);
 CREATE POLICY "Allow public access" ON public.products FOR ALL USING (true);
@@ -113,6 +125,7 @@ CREATE POLICY "Allow public access" ON public.suppliers FOR ALL USING (true);
 CREATE POLICY "Allow public access" ON public.transactions FOR ALL USING (true);
 CREATE POLICY "Allow public access" ON public.transaction_items FOR ALL USING (true);
 CREATE POLICY "Allow public access" ON public.users FOR ALL USING (true);
+CREATE POLICY "Allow public access" ON public.settings FOR ALL USING (true);
 
 -- Explicitly grant table permissions to anon role
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;

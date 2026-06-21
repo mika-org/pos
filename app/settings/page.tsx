@@ -46,16 +46,18 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     
-    // Simulate network delay
-    setTimeout(() => {
-      updateSettings(formData);
+    try {
+      await updateSettings(formData);
+      toast.success('Pengaturan berhasil disimpan!');
+    } catch (err) {
+      toast.error('Gagal menyimpan pengaturan.');
+    } finally {
       setIsSaving(false);
-      alert('Pengaturan berhasil disimpan!');
-    }, 500);
+    }
   };
 
   return (
