@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "migrate": "node scripts/migrate.js",
+    "migrate:dry": "node scripts/migrate.js --dry-run",
+    "migrate:file": "node scripts/migrate.js --file",
     "supabase:link": "npx supabase link",
     "supabase:push": "npx supabase db push",
     "supabase:status": "npx supabase migration list"

@@ -1,6 +1,6 @@
 # RestoFlow POS - Smart & Premium Point of Sale
 
-RestoFlow is a modern, high-performance, cloud-synced Point of Sale (POS) system designed for premium dining experiences and restaurant workflows. It is built using **Next.js**, **Supabase**, **Zustand**, **Tailwind CSS v4**, and **Shadcn UI**.
+RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersinkronisasi ke cloud yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **Supabase**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
 
 ---
 
@@ -35,13 +35,20 @@ RestoFlow is a modern, high-performance, cloud-synced Point of Sale (POS) system
 - Tampilan laci detail pembayaran (detail customer, daftar produk, dan bukti pembayaran yang dapat diunduh/diperbesar).
 - Workflow status pengerjaan (Mulai Siapkan ➡️ Kirim Pesanan ➡️ Selesaikan Pesanan) lengkap dengan simulasi pengiriman email notifikasi.
 
-### 6. Master Data & Layout Responsif
+### 6. Dasbor Analitik Kaya (Analytics Dashboard)
+- **Metric Cards**: Pendapatan hari ini, jumlah transaksi, produk terlaris, dan peringatan stok menipis.
+- **Tren Pendapatan**: Area chart 7 hari terakhir (POS + Pesanan Meja).
+- **Sumber Transaksi**: Donut pie chart perbandingan omzet POS Kasir vs Pesanan Meja.
+- **Menu Terlaris (Top 5)**: Tabel produk dengan jumlah porsi dan total pendapatan.
+- **Pesanan Meja Aktif**: Live list pesanan `pending/preparing/delivery` dengan tombol verifikasi cepat.
+
+### 7. Master Data & Layout Responsif
 - **Master Meja**: Grid kartu meja makan interaktif untuk mengelola meja (Aktif/Nonaktif) dan mencetak QR Code pemesanan mandiri per meja.
 - **Master Produk**: Manajemen stok, harga beli, harga jual, barcode, kategori, dan foto menu.
 - **Master Kategori, Pelanggan, Supplier, & Pengguna**: Database entitas penunjang transaksi toko.
 - **Sidebar & Header**: Sidebar desktop yang dapat dilipat (collapsible) menyimpan status preferensi, serta sliding overlay drawer di perangkat mobile.
 
-### 7. Pengaturan & Laporan (Settings & Reports)
+### 8. Pengaturan & Laporan (Settings & Reports)
 - **Settings**: Konfigurasi profil toko, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen banyak rekening bank transfer toko.
 - **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi (gabungan POS & order meja) dengan kolom sumber (POS Kasir / Pesanan Meja) serta ekspor CSV.
 - **Backup**: Pencadangan database dari cloud Supabase ke format file JSON secara instan.
@@ -50,30 +57,87 @@ RestoFlow is a modern, high-performance, cloud-synced Point of Sale (POS) system
 
 ## 🛠️ Cara Migrasi Database (Supabase Migrations)
 
-RestoFlow menggunakan standard migration CLI dari Supabase. Semua file skema database disimpan dalam folder `supabase/migrations/`.
+RestoFlow menyediakan **dua cara** untuk menerapkan migrasi database:
 
-### Persyaratan Awal (Prerequisites)
-Pastikan Anda memiliki Supabase CLI. Jika belum terinstal, Anda dapat menjalankannya langsung melalui `npx`.
+### Cara A: Migration Runner Otomatis (npm run migrate) ✨ Recommended
 
-### 1. Hubungkan Project ke Supabase
-Hubungkan kode lokal Anda dengan database remote Supabase Anda dengan menjalankan perintah:
+Migration runner bawaan yang membaca semua file SQL dari `supabase/migrations/` dan menerapkannya secara otomatis tanpa perlu Supabase CLI.
+
+#### Persiapan
+
+1. **Buat file `.env.local`** di root project (salin dari `.env.example`):
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+   > Temukan key di: Supabase Dashboard → Settings → API
+
+2. **Buat fungsi helper SQL** di Supabase SQL Editor (sekali saja):
+   ```sql
+   CREATE OR REPLACE FUNCTION public.exec_sql(sql text)
+   RETURNS void AS $$
+   BEGIN
+     EXECUTE sql;
+   END;
+   $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+   GRANT EXECUTE ON FUNCTION public.exec_sql TO service_role;
+   ```
+
+#### Perintah Migrasi
+
+| Perintah | Keterangan |
+|---|---|
+| `npm run migrate` | Terapkan semua migrasi yang belum dijalankan |
+| `npm run migrate:dry` | Lihat daftar file yang akan dijalankan tanpa mengubah database |
+| `npm run migrate:file 20260622000001` | Jalankan file migrasi tertentu saja |
+
+```bash
+# Preview apa yang akan dijalankan
+npm run migrate:dry
+
+# Terapkan semua migrasi
+npm run migrate
+```
+
+Migration runner secara otomatis:
+- ✅ Membaca semua `.sql` dari `supabase/migrations/` (urut berdasarkan nama file)
+- ✅ Melacak migrasi yang sudah diterapkan di tabel `migrations_log`
+- ✅ Melewati file yang sudah dijalankan sebelumnya (idempotent)
+- ✅ Memeriksa koneksi fallback dari `lib/supabase.ts` jika tidak ada `.env.local`
+
+---
+
+### Cara B: Supabase CLI (npx supabase)
+
+Menggunakan official Supabase CLI untuk link dan push migrasi.
+
+#### 1. Hubungkan Project ke Supabase
 ```bash
 npm run supabase:link
 ```
-*Anda akan diminta untuk memasukkan **Project Reference ID** (misal: `rgccflnozdvdmmxnshqv`) dan **Database Password** proyek Supabase Anda.*
+*Anda akan diminta untuk memasukkan **Project Reference ID** dan **Database Password** proyek Supabase Anda.*
 
-### 2. Jalankan Migrasi (Push Migrations)
-Terapkan semua file migrasi skema database lokal (`supabase/migrations/*`) ke database remote Supabase dengan menjalankan:
+#### 2. Jalankan Migrasi (Push Migrations)
 ```bash
 npm run supabase:push
 ```
-*Perintah ini akan secara otomatis membuat tabel-tabel (`users`, `products`, `categories`, `tables`, `customer_orders`, dll.), menetapkan relasi foregin key, menyalakan RLS, membuat policy publik, dan mengaktifkan database realtime replication untuk tabel `customer_orders`.*
+*Terapkan semua file migrasi skema database lokal ke database remote Supabase.*
 
-### 3. Cek Status Migrasi
-Untuk memeriksa riwayat file migrasi yang telah diterapkan di database remote, gunakan perintah:
+#### 3. Cek Status Migrasi
 ```bash
 npm run supabase:status
 ```
+
+---
+
+### File Migrasi yang Tersedia
+
+| File | Keterangan |
+|---|---|
+| `20260622000000_initial_schema.sql` | Skema lengkap: semua tabel, RLS, policy, dan data awal meja |
+| `20260622000001_orders_realtime.sql` | Aktifkan Supabase Realtime untuk `customer_orders` + seed data dummy produk & settings |
 
 ---
 
@@ -84,7 +148,16 @@ npm run supabase:status
 npm install
 ```
 
-### 2. Jalankan Server Development
+### 2. Terapkan Migrasi Database
+```bash
+# Review dulu
+npm run migrate:dry
+
+# Lalu terapkan
+npm run migrate
+```
+
+### 3. Jalankan Server Development
 ```bash
 npm run dev
 ```
@@ -93,3 +166,27 @@ Akses aplikasi di browser melalui:
 - Panel Kasir/Admin: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
   - *Akun Admin Bawaan:* `admin@store.com` / `admin123`
 - Halaman Order Meja: [http://localhost:3000/order?table=meja_01](http://localhost:3000/order?table=meja_01)
+
+---
+
+## 📁 Struktur Folder Penting
+
+```
+pos/
+├── app/                    # Next.js App Router pages
+│   ├── dashboard/          # Dasbor analitik utama
+│   ├── order/              # Halaman self-order publik (untuk pelanggan)
+│   ├── orders/             # Manajemen & verifikasi pesanan meja (admin)
+│   ├── pos/                # Kasir POS
+│   └── ...                 # pages lainnya
+├── components/             # React components
+│   └── layout/             # Header, Sidebar, AuthProvider
+├── lib/                    # Utilities: db types, supabase client, jwt, translations
+├── scripts/
+│   └── migrate.js          # ✨ Migration runner otomatis
+├── stores/                 # Zustand state stores
+├── supabase/
+│   └── migrations/         # File SQL migrasi database (urut timestamp)
+├── .env.example            # Template variabel environment
+└── README.md
+```
