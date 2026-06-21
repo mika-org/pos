@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, AppUser } from '@/lib/db';
 import { syncData } from '@/lib/sync';
+import bcrypt from 'bcryptjs';
 import { useAuthStore } from '@/stores/authStore';
 import { Plus, Search, Edit2, Trash2, Users, Shield, Key } from 'lucide-react';
 
@@ -56,11 +57,21 @@ export default function UsersPage() {
     if (!isAdmin) return;
 
     try {
+      const hashPasswordIfNeeded = (pass: string) => {
+        if (pass.startsWith('$2a$') || pass.startsWith('$2b$') || pass.startsWith('$2y$')) {
+          return pass;
+        }
+        const salt = bcrypt.genSaltSync(10);
+        return bcrypt.hashSync(pass, salt);
+      };
+
+      const hashedPassword = hashPasswordIfNeeded(formData.password);
+
       if (editingId) {
         await db.users.update(editingId, {
           name: formData.name,
           email: formData.email,
-          password: formData.password,
+          password: hashedPassword,
           role: formData.role,
           updatedAt: Date.now(),
           synced: false
@@ -70,7 +81,7 @@ export default function UsersPage() {
           id: crypto.randomUUID(),
           name: formData.name,
           email: formData.email,
-          password: formData.password,
+          password: hashedPassword,
           role: formData.role,
           createdAt: Date.now(),
           updatedAt: Date.now(),

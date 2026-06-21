@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
 import { db } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export function LoginView() {
@@ -31,14 +32,15 @@ export function LoginView() {
         
         // Auto-seed admin if no users exist
         const userCount = await db.users.count();
-        if (userCount === 0 && email === 'admin@store.com' && password === 'admin123') {
+        if (userCount === 0 && (email === 'admin@store.com' || email === 'admin@admin.com') && password === 'admin123') {
+          // Reverted: Default admin remains in-memory only and is not written to the local database
           login({ id: 'local-admin', email, role: 'admin', name: 'Admin Default' });
           return;
         }
 
         const localUser = await db.users.where('email').equals(email).first();
         
-        if (localUser && localUser.password === password && !localUser.deleted) {
+        if (localUser && localUser.password && bcrypt.compareSync(password, localUser.password) && !localUser.deleted) {
           login({ id: localUser.id!.toString(), email, role: localUser.role, name: localUser.name });
         } else {
           throw new Error('Invalid credentials');
