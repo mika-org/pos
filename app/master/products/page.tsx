@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Product, Category } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X, Image as ImageIcon } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,6 +25,8 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string | null; name: string }>({ open: false, id: null, name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -91,25 +95,34 @@ export default function ProductsPage() {
       await fetchData();
     } catch (error) {
       console.error('Failed to save product:', error);
-      alert('Gagal menyimpan produk');
+      toast.error('Gagal menyimpan produk');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-      try {
-        const { error } = await supabase
-          .from('products')
-          .update({
-            deleted: true,
-            updatedAt: Date.now()
-          })
-          .eq('id', id);
-        if (error) throw error;
-        await fetchData();
-      } catch (error) {
-        console.error('Failed to delete product:', error);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ open: true, id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          deleted: true,
+          updatedAt: Date.now()
+        })
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+      toast.success(`Produk "${confirmDelete.name}" berhasil dihapus`);
+      setConfirmDelete({ open: false, id: null, name: '' });
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      toast.error('Gagal menghapus produk');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -198,7 +211,7 @@ export default function ProductsPage() {
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert('Gagal menambah kategori');
+      toast.error('Gagal menambah kategori');
     }
   };
 
@@ -295,7 +308,7 @@ export default function ProductsPage() {
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(product.id!)}
+                        onClick={() => handleDelete(product.id!, product.name)}
                         className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Hapus"
                       >
@@ -516,6 +529,19 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Produk "${confirmDelete.name}"?`}
+        message="Produk ini akan dihapus dari katalog dan tidak dapat dijual lagi di kasir."
+        detail="Tindakan ini bersifat permanen. Data stok dan riwayat harga produk tidak dapat dipulihkan."
+        confirmLabel="Ya, Hapus Produk"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

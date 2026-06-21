@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Supplier } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export default function SuppliersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +14,8 @@ export default function SuppliersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string | null; name: string }>({ open: false, id: null, name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchSuppliers = async () => {
     setIsLoading(true);
@@ -72,25 +76,34 @@ export default function SuppliersPage() {
       await fetchSuppliers();
     } catch (error) {
       console.error('Failed to save supplier:', error);
-      alert('Gagal menyimpan supplier');
+      toast.error('Gagal menyimpan supplier');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
-      try {
-        const { error } = await supabase
-          .from('suppliers')
-          .update({
-            deleted: true,
-            updatedAt: Date.now()
-          })
-          .eq('id', id);
-        if (error) throw error;
-        await fetchSuppliers();
-      } catch (error) {
-        console.error('Failed to delete supplier:', error);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ open: true, id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('suppliers')
+        .update({
+          deleted: true,
+          updatedAt: Date.now()
+        })
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+      toast.success(`Supplier "${confirmDelete.name}" berhasil dihapus`);
+      setConfirmDelete({ open: false, id: null, name: '' });
+      await fetchSuppliers();
+    } catch (error) {
+      console.error('Failed to delete supplier:', error);
+      toast.error('Gagal menghapus supplier');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -175,7 +188,7 @@ export default function SuppliersPage() {
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(supplier.id!)}
+                        onClick={() => handleDelete(supplier.id!, supplier.name)}
                         className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Hapus"
                       >
@@ -259,6 +272,19 @@ export default function SuppliersPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Supplier "${confirmDelete.name}"?`}
+        message="Data supplier ini akan dihapus dari sistem secara permanen."
+        detail="Tindakan ini tidak dapat dibatalkan. Pastikan tidak ada transaksi terkait supplier ini."
+        confirmLabel="Ya, Hapus Supplier"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

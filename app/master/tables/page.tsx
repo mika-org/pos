@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,8 @@ export default function TablesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<DiningTable | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: '', name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Form states
   const [tableName, setTableName] = useState('');
@@ -111,21 +114,28 @@ export default function TablesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm(t('confirmDeleteTable'))) {
-      try {
-        const { error } = await supabase
-          .from('tables')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ open: true, id, name });
+  };
 
-        toast.success(t('successDeleteTable'));
-        await fetchTables();
-      } catch (err) {
-        console.error('Failed to delete table:', err);
-        toast.error('Failed to delete table');
-      }
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .delete()
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+
+      toast.success(t('successDeleteTable'));
+      setConfirmDelete({ open: false, id: '', name: '' });
+      await fetchTables();
+    } catch (err) {
+      console.error('Failed to delete table:', err);
+      toast.error('Failed to delete table');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -317,7 +327,7 @@ export default function TablesPage() {
                     <Button 
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDelete(table.id)}
+                      onClick={() => handleDelete(table.id, table.name)}
                       className="h-8 w-8 text-rose-600 hover:bg-rose-100/50 transition-colors cursor-pointer border border-transparent hover:border-rose-200/40 rounded-lg"
                       title="Hapus"
                     >
@@ -427,6 +437,19 @@ export default function TablesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: '', name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Meja "${confirmDelete.name}"?`}
+        message="Meja ini akan dihapus dari sistem. QR code yang sudah dicetak tidak akan berfungsi lagi."
+        detail="Tindakan ini bersifat permanen dan tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Meja"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

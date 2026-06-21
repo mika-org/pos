@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { useAuthStore } from '@/stores/authStore';
 import { Plus, Search, Edit2, Trash2, Users, Shield, Key } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,6 +25,8 @@ export default function UsersPage() {
   const isAdmin = currentUser?.role === 'admin';
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string | null; name: string }>({ open: false, id: null, name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -121,26 +125,35 @@ export default function UsersPage() {
       await fetchUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
-      alert('Gagal menyimpan pengguna');
+      toast.error('Gagal menyimpan pengguna');
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string, name: string) => {
     if (!isAdmin) return;
-    if (confirm('Yakin ingin menghapus pengguna ini?')) {
-      try {
-        const { error } = await supabase
-          .from('users')
-          .update({
-            deleted: true,
-            updatedAt: Date.now()
-          })
-          .eq('id', id);
-        if (error) throw error;
-        await fetchUsers();
-      } catch (error) {
-        console.error('Failed to delete user:', error);
-      }
+    setConfirmDelete({ open: true, id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          deleted: true,
+          updatedAt: Date.now()
+        })
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+      toast.success(`Pengguna "${confirmDelete.name}" berhasil dihapus`);
+      setConfirmDelete({ open: false, id: null, name: '' });
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      toast.error('Gagal menghapus pengguna');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -229,7 +242,7 @@ export default function UsersPage() {
                           <Edit2 size={16} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(user.id!.toString())}
+                          onClick={() => handleDelete(user.id!.toString(), user.name)}
                           disabled={user.email === currentUser?.email}
                           className="p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-50 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -330,6 +343,19 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Pengguna "${confirmDelete.name}"?`}
+        message="Akun pengguna ini akan dihapus dari sistem dan tidak dapat login lagi."
+        detail="Tindakan ini bersifat permanen dan tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Pengguna"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Customer } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export default function CustomersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +14,8 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string | null; name: string }>({ open: false, id: null, name: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchCustomers = async () => {
     setIsLoading(true);
@@ -72,25 +76,34 @@ export default function CustomersPage() {
       await fetchCustomers();
     } catch (error) {
       console.error('Failed to save customer:', error);
-      alert('Gagal menyimpan customer');
+      toast.error('Gagal menyimpan customer');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus customer ini?')) {
-      try {
-        const { error } = await supabase
-          .from('customers')
-          .update({
-            deleted: true,
-            updatedAt: Date.now()
-          })
-          .eq('id', id);
-        if (error) throw error;
-        await fetchCustomers();
-      } catch (error) {
-        console.error('Failed to delete customer:', error);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ open: true, id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          deleted: true,
+          updatedAt: Date.now()
+        })
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+      toast.success(`Customer "${confirmDelete.name}" berhasil dihapus`);
+      setConfirmDelete({ open: false, id: null, name: '' });
+      await fetchCustomers();
+    } catch (error) {
+      console.error('Failed to delete customer:', error);
+      toast.error('Gagal menghapus customer');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -175,7 +188,7 @@ export default function CustomersPage() {
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(customer.id!)}
+                        onClick={() => handleDelete(customer.id!, customer.name)}
                         className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Hapus"
                       >
@@ -259,6 +272,19 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Customer "${confirmDelete.name}"?`}
+        message="Data customer ini akan dihapus dari sistem. Riwayat transaksi terkait tetap tersimpan."
+        detail="Tindakan ini bersifat permanen dan tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Customer"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Category } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export default function CategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +14,10 @@ export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string | null; name: string }>({
+    open: false, id: null, name: ''
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -72,25 +78,34 @@ export default function CategoriesPage() {
       await fetchCategories();
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert('Gagal menyimpan kategori');
+      toast.error('Gagal menyimpan kategori');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus kategori ini?')) {
-      try {
-        const { error } = await supabase
-          .from('categories')
-          .update({
-            deleted: true,
-            updatedAt: Date.now()
-          })
-          .eq('id', id);
-        if (error) throw error;
-        await fetchCategories();
-      } catch (error) {
-        console.error('Failed to delete category:', error);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDelete({ open: true, id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({
+          deleted: true,
+          updatedAt: Date.now()
+        })
+        .eq('id', confirmDelete.id);
+      if (error) throw error;
+      toast.success(`Kategori "${confirmDelete.name}" berhasil dihapus`);
+      setConfirmDelete({ open: false, id: null, name: '' });
+      await fetchCategories();
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast.error('Gagal menghapus kategori');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -171,7 +186,7 @@ export default function CategoriesPage() {
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(category.id!)}
+                        onClick={() => handleDelete(category.id!, category.name)}
                         className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Hapus"
                       >
@@ -236,6 +251,19 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Hapus Kategori "${confirmDelete.name}"?`}
+        message="Kategori yang dihapus tidak akan muncul di sistem lagi. Produk yang terhubung ke kategori ini akan tetap ada."
+        detail="Tindakan ini bersifat permanen dan tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Kategori"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
