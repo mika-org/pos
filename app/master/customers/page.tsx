@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Customer } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -32,6 +33,7 @@ export default function CustomersPage() {
         });
       } else {
         await db.customers.add({
+          id: crypto.randomUUID(),
           ...formData,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -40,6 +42,7 @@ export default function CustomersPage() {
         });
       }
       closeModal();
+      syncData(true);
     } catch (error) {
       console.error('Failed to save customer:', error);
       alert('Gagal menyimpan customer');
@@ -54,6 +57,7 @@ export default function CustomersPage() {
           updatedAt: Date.now(),
           synced: false
         });
+        syncData(true);
       } catch (error) {
         console.error('Failed to delete customer:', error);
       }

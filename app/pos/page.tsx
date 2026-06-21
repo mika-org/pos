@@ -7,7 +7,8 @@ import { usePOSStore } from '@/stores/posStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Receipt } from '@/components/pos/Receipt';
-import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X } from 'lucide-react';
+import { syncData } from '@/lib/sync';
+import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode } from 'lucide-react';
 
 export default function POSPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,12 +17,15 @@ export default function POSPage() {
   const [amountPaid, setAmountPaid] = useState('');
   const [completedTransaction, setCompletedTransaction] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'Transfer'>('Tunai');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { settings } = useSettingsStore();
   const { user } = useAuthStore();
 
   // Store actions
   const { cart, addToCart, removeFromCart, updateQty, getSubtotal, getTotal, clearCart } = usePOSStore();
+
+  const finalTotal = getTotal() + (getTotal() * (settings.taxPercentage / 100));
 
   // Queries
   const categories = useLiveQuery(() => db.categories.filter(c => !c.deleted).toArray());
@@ -107,7 +111,7 @@ export default function POSPage() {
         discount: usePOSStore.getState().globalDiscount,
         tax: taxAmount,
         total: finalTotal,
-        paymentMethod: 'Tunai',
+        paymentMethod: paymentMethod,
         amountPaid: paid,
         change: paid - finalTotal,
         status: 'completed',
@@ -147,6 +151,9 @@ export default function POSPage() {
       // Set transaction for receipt and open success modal
       setCompletedTransaction({ tx: { ...txData, id: txId.toString() }, items: txItems });
       setIsSuccessModalOpen(true);
+
+      // Trigger background sync
+      syncData(true);
     } catch (error) {
       console.error('Checkout failed:', error);
       alert('Terjadi kesalahan saat memproses transaksi');
@@ -376,7 +383,7 @@ export default function POSPage() {
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
               <span className="text-slate-800 font-bold">Total</span>
               <span className="text-2xl font-bold text-blue-600">
-                Rp {(getTotal() + (getTotal() * (settings.taxPercentage / 100))).toLocaleString('id-ID')}
+                Rp {finalTotal.toLocaleString('id-ID')}
               </span>
             </div>
           </div>
@@ -390,7 +397,11 @@ export default function POSPage() {
               Hold Bill
             </button>
             <button 
-              onClick={() => setIsPaymentModalOpen(true)}
+              onClick={() => {
+                setPaymentMethod('Tunai');
+                setAmountPaid('');
+                setIsPaymentModalOpen(true);
+              }}
               disabled={cart.length === 0}
               className="py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
@@ -414,26 +425,96 @@ export default function POSPage() {
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-slate-500 mb-1">Total Tagihan</p>
-                <p className="text-4xl font-bold text-blue-600">Rp {(getTotal() + (getTotal() * (settings.taxPercentage / 100))).toLocaleString('id-ID')}</p>
+                <p className="text-4xl font-bold text-blue-600">Rp {finalTotal.toLocaleString('id-ID')}</p>
               </div>
 
               <div className="grid grid-cols-3 gap-3 mb-6">
-                <button className="py-3 px-4 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-700 font-medium flex flex-col items-center justify-center space-y-1">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('Tunai');
+                    setAmountPaid('');
+                  }}
+                  className={`py-3 px-4 rounded-xl border-2 font-medium flex flex-col items-center justify-center space-y-1 transition-all ${
+                    paymentMethod === 'Tunai'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
                   <Banknote size={24} />
                   <span className="text-xs">Tunai</span>
                 </button>
-                <button className="py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 hover:border-slate-300 font-medium flex flex-col items-center justify-center space-y-1">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('QRIS');
+                    setAmountPaid(finalTotal.toString());
+                  }}
+                  className={`py-3 px-4 rounded-xl border-2 font-medium flex flex-col items-center justify-center space-y-1 transition-all ${
+                    paymentMethod === 'QRIS'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
                   <Scan size={24} />
                   <span className="text-xs">QRIS</span>
                 </button>
-                <button className="py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 hover:border-slate-300 font-medium flex flex-col items-center justify-center space-y-1">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('Transfer');
+                    setAmountPaid(finalTotal.toString());
+                  }}
+                  className={`py-3 px-4 rounded-xl border-2 font-medium flex flex-col items-center justify-center space-y-1 transition-all ${
+                    paymentMethod === 'Transfer'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
                   <CreditCard size={24} />
                   <span className="text-xs">Transfer</span>
                 </button>
               </div>
 
+              {/* QRIS Display Block */}
+              {paymentMethod === 'QRIS' && (
+                <div className="mb-6 flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  {settings.qrisImage ? (
+                    <div className="flex flex-col items-center space-y-3">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                        <QrCode size={12} className="text-indigo-500" />
+                        Pindai Kode QRIS Toko
+                      </span>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                        <img 
+                          src={settings.qrisImage} 
+                          alt="QRIS QR Code" 
+                          className="w-48 h-48 object-contain"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-semibold text-slate-400">Total Pembayaran</p>
+                        <p className="text-base font-bold text-slate-800">Rp {finalTotal.toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-3 px-2 space-y-2 max-w-sm">
+                      <div className="mx-auto w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center border border-amber-200">
+                        <Scan size={20} className="text-amber-500 animate-pulse" />
+                      </div>
+                      <h3 className="text-xs font-bold text-slate-800">QRIS Belum Diunggah</h3>
+                      <p className="text-[11px] text-slate-500 leading-normal">
+                        Unggah gambar QRIS di menu <strong>Pengaturan</strong> terlebih dahulu agar QR code dapat tampil di sini.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-700">Jumlah Uang Diterima</label>
+                <label className="block text-sm font-medium text-slate-700">
+                  {paymentMethod === 'Tunai' ? 'Jumlah Uang Diterima' : `Konfirmasi Jumlah Bayar (${paymentMethod})`}
+                </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium">Rp</span>
                   <input 
@@ -447,33 +528,38 @@ export default function POSPage() {
                 </div>
                 
                 {/* Uang Pas / Quick Amounts */}
-                <div className="flex space-x-2 mt-2">
-                  <button 
-                    onClick={() => setAmountPaid(getTotal().toString())}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-                  >
-                    Uang Pas
-                  </button>
-                  <button 
-                    onClick={() => setAmountPaid((getTotal() + 10000).toString())}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-                  >
-                    +10Rb
-                  </button>
-                  <button 
-                    onClick={() => setAmountPaid((getTotal() + 50000).toString())}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-                  >
-                    +50Rb
-                  </button>
-                </div>
+                {paymentMethod === 'Tunai' && (
+                  <div className="flex space-x-2 mt-2">
+                    <button 
+                      type="button"
+                      onClick={() => setAmountPaid(finalTotal.toString())}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                    >
+                      Uang Pas
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setAmountPaid((finalTotal + 10000).toString())}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                    >
+                      +10Rb
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setAmountPaid((finalTotal + 50000).toString())}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                    >
+                      +50Rb
+                    </button>
+                  </div>
+                )}
               </div>
 
               {Number(amountPaid) > 0 && (
                 <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center">
                   <span className="text-slate-600 font-medium">Kembalian</span>
-                  <span className={`text-xl font-bold ${Number(amountPaid) >= (getTotal() + (getTotal() * (settings.taxPercentage / 100))) ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    Rp {(Number(amountPaid) - (getTotal() + (getTotal() * (settings.taxPercentage / 100)))).toLocaleString('id-ID')}
+                  <span className={`text-xl font-bold ${Number(amountPaid) >= finalTotal ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    Rp {(Number(amountPaid) - finalTotal).toLocaleString('id-ID')}
                   </span>
                 </div>
               )}
@@ -481,8 +567,9 @@ export default function POSPage() {
             
             <div className="p-4 border-t border-slate-100 bg-slate-50">
               <button 
+                type="button"
                 onClick={handleCheckout}
-                disabled={Number(amountPaid) < (getTotal() + (getTotal() * (settings.taxPercentage / 100)))}
+                disabled={Number(amountPaid) < finalTotal}
                 className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Selesaikan Pembayaran

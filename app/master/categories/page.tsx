@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Category } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function CategoriesPage() {
@@ -32,7 +33,9 @@ export default function CategoriesPage() {
           synced: false,
         });
       } else {
+        // Generate a secure UUID locally to avoid conflicts during synchronization
         await db.categories.add({
+          id: crypto.randomUUID(),
           name: formData.name,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -41,6 +44,7 @@ export default function CategoriesPage() {
         });
       }
       closeModal();
+      syncData(true);
     } catch (error) {
       console.error('Failed to save category:', error);
       alert('Gagal menyimpan kategori');
@@ -56,6 +60,7 @@ export default function CategoriesPage() {
           updatedAt: Date.now(),
           synced: false
         });
+        syncData(true);
       } catch (error) {
         console.error('Failed to delete category:', error);
       }

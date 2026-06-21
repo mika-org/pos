@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { Save, Store, Calculator, Database, Download, Cloud } from 'lucide-react';
+import { Save, Store, Calculator, Database, Download, Cloud, QrCode, UploadCloud, X } from 'lucide-react';
 import { exportLocalDb, exportSupabaseDb } from '@/lib/backupUtils';
 import toast from 'react-hot-toast';
 
@@ -22,6 +22,28 @@ export default function SettingsPage() {
       ...prev,
       [name]: type === 'number' ? Number(value) : value
     }));
+  };
+
+  const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran file terlalu besar! Maksimal 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData(prev => ({
+          ...prev,
+          qrisImage: event.target!.result as string
+        }));
+        toast.success('QRIS berhasil diunggah!');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -116,6 +138,53 @@ export default function SettingsPage() {
               <p className="text-xs text-slate-500 mt-1">
                 Pajak ini akan otomatis ditambahkan ke total belanja pelanggan saat checkout.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* QRIS Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <QrCode className="text-indigo-500" />
+            <h2 className="text-lg font-bold text-slate-800">QRIS Pembayaran</h2>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-slate-500">Unggah gambar QR code QRIS toko Anda agar pelanggan dapat melakukan pembayaran secara non-tunai saat checkout di POS.</p>
+            
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-6 bg-slate-50 hover:bg-slate-100/50 transition-colors relative">
+              {formData.qrisImage ? (
+                <div className="relative flex flex-col items-center">
+                  <div className="relative group bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <img 
+                      src={formData.qrisImage} 
+                      alt="QRIS QR Code" 
+                      className="w-48 h-48 object-contain" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, qrisImage: '' }))}
+                      className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white p-1.5 rounded-full shadow-md transition-colors animate-in fade-in duration-200"
+                      title="Hapus QRIS"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 font-medium">Klik tombol silang di atas untuk mengganti gambar.</p>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-full py-6 cursor-pointer select-none">
+                  <UploadCloud size={48} className="text-slate-400 mb-3" />
+                  <span className="text-sm font-semibold text-slate-600">Pilih berkas gambar QRIS</span>
+                  <span className="text-xs text-slate-400 mt-1">Format PNG, JPG, atau JPEG (Maks. 2MB)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleQrisUpload}
+                    className="hidden"
+                  />
+                </label>
+              )}
             </div>
           </div>
         </div>

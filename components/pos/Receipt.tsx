@@ -77,7 +77,7 @@ export function Receipt({ transaction, items }: ReceiptProps) {
           <span>{transaction.total.toLocaleString('id-ID')}</span>
         </div>
         <div className="flex justify-between mt-1">
-          <span>Tunai:</span>
+          <span>{transaction.paymentMethod || 'Tunai'}:</span>
           <span>{transaction.amountPaid.toLocaleString('id-ID')}</span>
         </div>
         <div className="flex justify-between">

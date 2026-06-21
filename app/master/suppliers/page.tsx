@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Supplier } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 
 export default function SuppliersPage() {
@@ -32,6 +33,7 @@ export default function SuppliersPage() {
         });
       } else {
         await db.suppliers.add({
+          id: crypto.randomUUID(),
           ...formData,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -40,6 +42,7 @@ export default function SuppliersPage() {
         });
       }
       closeModal();
+      syncData(true);
     } catch (error) {
       console.error('Failed to save supplier:', error);
       alert('Gagal menyimpan supplier');
@@ -54,6 +57,7 @@ export default function SuppliersPage() {
           updatedAt: Date.now(),
           synced: false
         });
+        syncData(true);
       } catch (error) {
         console.error('Failed to delete supplier:', error);
       }

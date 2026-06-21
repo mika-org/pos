@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Product } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { Plus, Edit2, Trash2, Search, X, Image as ImageIcon } from 'lucide-react';
 
 export default function ProductsPage() {
@@ -55,12 +56,14 @@ export default function ProductsPage() {
         await db.products.update(editingId, payload);
       } else {
         await db.products.add({
+          id: crypto.randomUUID(),
           ...payload,
           createdAt: Date.now(),
           deleted: false,
         });
       }
       closeModal();
+      syncData(true);
     } catch (error) {
       console.error('Failed to save product:', error);
       alert('Gagal menyimpan produk');
@@ -75,6 +78,7 @@ export default function ProductsPage() {
           updatedAt: Date.now(),
           synced: false
         });
+        syncData(true);
       } catch (error) {
         console.error('Failed to delete product:', error);
       }
@@ -149,16 +153,19 @@ export default function ProductsPage() {
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
     try {
-      const newCatId = await db.categories.add({
+      const uuid = crypto.randomUUID();
+      await db.categories.add({
+        id: uuid,
         name: newCategoryName,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         synced: false,
         deleted: false
       });
-      setFormData({ ...formData, categoryId: newCatId.toString() });
+      setFormData({ ...formData, categoryId: uuid });
       setIsCategoryModalOpen(false);
       setNewCategoryName('');
+      syncData(true);
     } catch (err) {
       console.error(err);
       alert('Gagal menambah kategori');

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, AppUser } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { useAuthStore } from '@/stores/authStore';
 import { Plus, Search, Edit2, Trash2, Users, Shield, Key } from 'lucide-react';
 
@@ -66,6 +67,7 @@ export default function UsersPage() {
         });
       } else {
         await db.users.add({
+          id: crypto.randomUUID(),
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -78,6 +80,7 @@ export default function UsersPage() {
       }
       setIsModalOpen(false);
       resetForm();
+      syncData(true);
     } catch (error) {
       console.error('Failed to save user:', error);
       alert('Gagal menyimpan pengguna');
@@ -93,6 +96,7 @@ export default function UsersPage() {
           updatedAt: Date.now(),
           synced: false
         });
+        syncData(true);
       } catch (error) {
         console.error('Failed to delete user:', error);
       }

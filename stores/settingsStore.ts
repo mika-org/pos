@@ -6,6 +6,7 @@ interface StoreSettings {
   storeAddress: string;
   storePhone: string;
   taxPercentage: number;
+  qrisImage?: string;
 }
 
 interface SettingsState {
@@ -21,6 +22,7 @@ export const useSettingsStore = create<SettingsState>()(
         storeAddress: 'Jl. Contoh Alamat No. 123',
         storePhone: '08123456789',
         taxPercentage: 0,
+        qrisImage: '',
       },
       updateSettings: (newSettings) => 
         set((state) => ({
