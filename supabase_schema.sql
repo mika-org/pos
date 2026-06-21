@@ -118,14 +118,25 @@ ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public access" ON public.categories FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.products FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.customers FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.suppliers FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.transactions FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.transaction_items FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.users FOR ALL USING (true);
-CREATE POLICY "Allow public access" ON public.settings FOR ALL USING (true);
+-- Drop existing policies if re-running
+DROP POLICY IF EXISTS "Allow public access" ON public.categories;
+DROP POLICY IF EXISTS "Allow public access" ON public.products;
+DROP POLICY IF EXISTS "Allow public access" ON public.customers;
+DROP POLICY IF EXISTS "Allow public access" ON public.suppliers;
+DROP POLICY IF EXISTS "Allow public access" ON public.transactions;
+DROP POLICY IF EXISTS "Allow public access" ON public.transaction_items;
+DROP POLICY IF EXISTS "Allow public access" ON public.users;
+DROP POLICY IF EXISTS "Allow public access" ON public.settings;
+
+-- Re-create policies with WITH CHECK for full INSERT/UPDATE/UPSERT support
+CREATE POLICY "Allow public access" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.customers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.suppliers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.transactions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.transaction_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access" ON public.settings FOR ALL USING (true) WITH CHECK (true);
 
 -- Explicitly grant table permissions to anon role
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
