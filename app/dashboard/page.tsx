@@ -11,30 +11,27 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<TransactionItem[]>([]);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [customerOrderItems, setCustomerOrderItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('*')
-          .eq('deleted', false);
-        
-        const { data: transactionsData } = await supabase
-          .from('transactions')
-          .select('*')
-          .gte('date', subDays(startOfDay(new Date()), 30).getTime());
+        const [productsRes, transactionsRes, itemsRes, customerOrdersRes, customerOrderItemsRes] = await Promise.all([
+          supabase.from('products').select('*').eq('deleted', false),
+          supabase.from('transactions').select('*').gte('date', subDays(startOfDay(new Date()), 30).getTime()),
+          supabase.from('transaction_items').select('*').limit(1000),
+          supabase.from('customer_orders').select('*').eq('status', 'finished').gte('created_at', subDays(startOfDay(new Date()), 30).getTime()),
+          supabase.from('customer_order_items').select('*').limit(1000)
+        ]);
 
-        const { data: itemsData } = await supabase
-          .from('transaction_items')
-          .select('*')
-          .limit(1000);
-
-        setProducts(productsData || []);
-        setTransactions(transactionsData || []);
-        setItems(itemsData || []);
+        setProducts(productsRes.data || []);
+        setTransactions(transactionsRes.data || []);
+        setItems(itemsRes.data || []);
+        setCustomerOrders(customerOrdersRes.data || []);
+        setCustomerOrderItems(customerOrderItemsRes.data || []);
       } catch (err) {
         console.error('Error loading dashboard data:', err);
       } finally {
@@ -48,21 +45,29 @@ export default function Dashboard() {
   const today = startOfDay(new Date()).getTime();
 
   // Metrics
-  const todayRevenue = transactions
-    .filter(tx => tx.date >= today && tx.status === 'completed')
-    .reduce((sum, tx) => sum + tx.total, 0);
+  const todayRevenue = 
+    transactions
+      .filter(tx => tx.date >= today && tx.status === 'completed')
+      .reduce((sum, tx) => sum + tx.total, 0) +
+    customerOrders
+      .filter(co => co.created_at >= today && co.status === 'finished')
+      .reduce((sum, co) => sum + co.total_amount, 0);
 
-  const todaySalesCount = transactions
-    .filter(tx => tx.date >= today && tx.status === 'completed')
-    .length;
+  const todaySalesCount = 
+    transactions.filter(tx => tx.date >= today && tx.status === 'completed').length +
+    customerOrders.filter(co => co.created_at >= today && co.status === 'finished').length;
 
   const lowStockProducts = products.filter(p => !p.deleted && p.stock <= 5).length;
 
   let bestSellingProduct = '-';
-  if (items.length > 0) {
+  if (items.length > 0 || customerOrderItems.length > 0) {
     const productSales: Record<string, number> = {};
     items.forEach(item => {
       productSales[item.productName] = (productSales[item.productName] || 0) + item.qty;
+    });
+    customerOrderItems.forEach(item => {
+      const prodName = products.find(p => p.id === item.product_id)?.name || 'Unknown Product';
+      productSales[prodName] = (productSales[prodName] || 0) + item.quantity;
     });
     
     let maxQty = 0;
@@ -81,9 +86,13 @@ export default function Dashboard() {
     const start = startOfDay(date).getTime();
     const end = start + 86400000;
     
-    const dayRevenue = transactions
-      .filter(tx => tx.date >= start && tx.date < end && tx.status === 'completed')
-      .reduce((sum, tx) => sum + tx.total, 0);
+    const dayRevenue = 
+      transactions
+        .filter(tx => tx.date >= start && tx.date < end && tx.status === 'completed')
+        .reduce((sum, tx) => sum + tx.total, 0) +
+      customerOrders
+        .filter(co => co.created_at >= start && co.created_at < end && co.status === 'finished')
+        .reduce((sum, co) => sum + co.total_amount, 0);
       
     chartData.push({
       name: format(date, 'dd MMM'),
@@ -147,8 +156,8 @@ export default function Dashboard() {
 
       <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 h-96 flex flex-col">
         <h2 className="text-lg font-bold text-slate-800 mb-6">Grafik Pendapatan (7 Hari Terakhir)</h2>
-        <div className="flex-1 w-full min-h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="flex-1 w-full min-h-[300px] min-w-0 relative">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">

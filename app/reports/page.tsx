@@ -10,6 +10,7 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter logic
@@ -17,49 +18,79 @@ export default function ReportsPage() {
   const endTs = endOfDay(new Date(endDate)).getTime();
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchReportData = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('*')
-          .gte('date', startTs)
-          .lte('date', endTs)
-          .eq('status', 'completed');
+        const [transactionsRes, customerOrdersRes] = await Promise.all([
+          supabase
+            .from('transactions')
+            .select('*')
+            .gte('date', startTs)
+            .lte('date', endTs)
+            .eq('status', 'completed'),
+          supabase
+            .from('customer_orders')
+            .select('*')
+            .gte('created_at', startTs)
+            .lte('created_at', endTs)
+            .eq('status', 'finished')
+        ]);
 
-        if (error) {
-          console.error('Error fetching transactions for reports:', error);
-        } else {
-          setTransactions(data || []);
-        }
+        if (transactionsRes.error) throw transactionsRes.error;
+        if (customerOrdersRes.error) throw customerOrdersRes.error;
+
+        setTransactions(transactionsRes.data || []);
+        setCustomerOrders(customerOrdersRes.data || []);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching reports data:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTransactions();
+    fetchReportData();
   }, [startDate, endDate]);
 
-  const filteredTransactions = [...transactions].sort((a, b) => b.date - a.date); // Newest first
+  // Combine transactions and customer self-orders/table orders
+  const combinedItems = [
+    ...transactions.map(tx => ({
+      id: tx.id,
+      no: tx.no,
+      date: tx.date,
+      subtotal: tx.subtotal,
+      discount: tx.discount,
+      total: tx.total,
+      paymentMethod: tx.paymentMethod,
+      type: 'POS Kasir'
+    })),
+    ...customerOrders.map(co => ({
+      id: co.id,
+      no: co.id,
+      date: co.created_at,
+      subtotal: co.total_amount, // Self orders don't store separate discount/subtotal field, total is subtotal
+      discount: 0,
+      total: co.total_amount,
+      paymentMethod: co.payment_method === 'qris' ? 'QRIS' : 'Transfer Bank',
+      type: co.table_id ? `Meja (${co.table_id.replace('meja_', 'Meja ')})` : 'Self-Order (Takeaway)'
+    }))
+  ].sort((a, b) => b.date - a.date); // Newest first
 
   // Summary Metrics
-  const totalRevenue = filteredTransactions.reduce((sum, tx) => sum + tx.total, 0);
-  const totalDiscount = filteredTransactions.reduce((sum, tx) => sum + tx.discount, 0);
-  const totalSubtotal = filteredTransactions.reduce((sum, tx) => sum + tx.subtotal, 0);
-  const transactionCount = filteredTransactions.length;
+  const totalRevenue = combinedItems.reduce((sum, item) => sum + item.total, 0);
+  const totalDiscount = combinedItems.reduce((sum, item) => sum + item.discount, 0);
+  const totalSubtotal = combinedItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const transactionCount = combinedItems.length;
 
   const exportToCSV = () => {
-    const headers = ['No. Transaksi', 'Tanggal', 'Subtotal', 'Diskon', 'Total', 'Metode Bayar', 'Status'];
-    const rows = filteredTransactions.map(tx => [
-      tx.no,
-      format(tx.date, 'yyyy-MM-dd HH:mm:ss'),
-      tx.subtotal,
-      tx.discount,
-      tx.total,
-      tx.paymentMethod,
-      tx.status
+    const headers = ['No. Transaksi', 'Tanggal', 'Tipe / Sumber', 'Subtotal', 'Diskon', 'Total', 'Metode Bayar'];
+    const rows = combinedItems.map(item => [
+      item.no,
+      format(item.date, 'yyyy-MM-dd HH:mm:ss'),
+      item.type,
+      item.subtotal,
+      item.discount,
+      item.total,
+      item.paymentMethod
     ]);
     
     const csvContent = [
@@ -103,7 +134,7 @@ export default function ReportsPage() {
           </div>
           <button 
             onClick={exportToCSV}
-            disabled={filteredTransactions.length === 0}
+            disabled={combinedItems.length === 0}
             className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             <Download size={16} />
@@ -156,6 +187,7 @@ export default function ReportsPage() {
               <tr>
                 <th className="px-6 py-3 font-medium">No. Transaksi</th>
                 <th className="px-6 py-3 font-medium">Tanggal</th>
+                <th className="px-6 py-3 font-medium">Tipe / Sumber</th>
                 <th className="px-6 py-3 font-medium">Subtotal</th>
                 <th className="px-6 py-3 font-medium">Diskon</th>
                 <th className="px-6 py-3 font-medium">Total</th>
@@ -164,24 +196,33 @@ export default function ReportsPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     Memuat data...
                   </td>
                 </tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : combinedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     Tidak ada data transaksi pada rentang tanggal tersebut.
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map(tx => (
-                  <tr key={tx.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 font-medium text-slate-800">{tx.no}</td>
-                    <td className="px-6 py-3 text-slate-600">{format(tx.date, 'dd MMM yyyy, HH:mm')}</td>
-                    <td className="px-6 py-3 text-slate-600">Rp {tx.subtotal.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-3 text-rose-500">Rp {tx.discount.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-3 font-bold text-emerald-600">Rp {tx.total.toLocaleString('id-ID')}</td>
+                combinedItems.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-3 font-medium text-slate-800 select-all uppercase text-xs tracking-wider">{item.no}</td>
+                    <td className="px-6 py-3 text-slate-600">{format(item.date, 'dd MMM yyyy, HH:mm')}</td>
+                    <td className="px-6 py-3">
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                        item.type.includes('Meja') ? 'bg-blue-100 text-blue-800' :
+                        item.type.includes('Takeaway') ? 'bg-amber-100 text-amber-800' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-slate-600">Rp {item.subtotal.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-3 text-rose-500">Rp {item.discount.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-3 font-bold text-emerald-600">Rp {item.total.toLocaleString('id-ID')}</td>
                   </tr>
                 ))
               )}

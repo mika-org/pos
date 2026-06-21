@@ -27,22 +27,16 @@ export default function ProductsPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('deleted', false)
-        .order('createdAt', { ascending: false });
+      const [productsRes, categoriesRes] = await Promise.all([
+        supabase.from('products').select('*').eq('deleted', false).order('createdAt', { ascending: false }),
+        supabase.from('categories').select('*').eq('deleted', false)
+      ]);
 
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('deleted', false);
+      if (productsRes.error) console.error('Error fetching products:', productsRes.error);
+      if (categoriesRes.error) console.error('Error fetching categories:', categoriesRes.error);
 
-      if (productsError) console.error('Error fetching products:', productsError);
-      if (categoriesError) console.error('Error fetching categories:', categoriesError);
-
-      setProducts(productsData || []);
-      setCategories(categoriesData || []);
+      setProducts(productsRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -478,7 +472,7 @@ export default function ProductsPage() {
 
       {/* Category Inline Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-60 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-lg font-bold text-slate-800">Tambah Kategori Baru</h2>

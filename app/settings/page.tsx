@@ -2,14 +2,46 @@
 
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { Save, Store, Calculator, Database, Download, Cloud, QrCode, UploadCloud, X } from 'lucide-react';
+import { Save, Store, Calculator, Database, Download, Cloud, QrCode, UploadCloud, X, Landmark, Plus, Trash2 } from 'lucide-react';
 import { exportSupabaseDb } from '@/lib/backupUtils';
 import toast from 'react-hot-toast';
+import { useTranslation } from '@/stores/languageStore';
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettingsStore();
   const [formData, setFormData] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
+  const [newBank, setNewBank] = useState({ bankName: '', accountNumber: '', accountHolder: '' });
+  const { t } = useTranslation();
+
+  const addBankAccount = () => {
+    if (!newBank.bankName.trim() || !newBank.accountNumber.trim() || !newBank.accountHolder.trim()) {
+      toast.error("Semua kolom bank wajib diisi!");
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      bankAccounts: [
+        ...(prev.bankAccounts || []),
+        {
+          id: `bank_${Date.now()}`,
+          bankName: newBank.bankName.trim(),
+          accountNumber: newBank.accountNumber.trim(),
+          accountHolder: newBank.accountHolder.trim()
+        }
+      ]
+    }));
+    setNewBank({ bankName: '', accountNumber: '', accountHolder: '' });
+    toast.success("Rekening berhasil ditambahkan ke daftar!");
+  };
+
+  const removeBankAccount = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      bankAccounts: (prev.bankAccounts || []).filter(b => b.id !== id)
+    }));
+    toast.success("Rekening dihapus dari daftar.");
+  };
 
   // Sync state if store updates from elsewhere
   useEffect(() => {
@@ -114,15 +146,15 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Tax Rules Section */}
+        {/* Tax & Order Rules Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
             <Calculator className="text-emerald-500" />
-            <h2 className="text-lg font-bold text-slate-800">Pengaturan Pajak</h2>
+            <h2 className="text-lg font-bold text-slate-800">Aturan Penjualan & Pajak</h2>
           </div>
           
-          <div className="p-6">
-            <div className="max-w-md space-y-2">
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Pajak Penjualan (%)</label>
               <div className="relative">
                 <input 
@@ -139,6 +171,26 @@ export default function SettingsPage() {
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 Pajak ini akan otomatis ditambahkan ke total belanja pelanggan saat checkout.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Maks. Ukuran Bukti Bayar (MB)</label>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  name="maxFileSize"
+                  min="1"
+                  max="50"
+                  value={formData.maxFileSize || 5}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-10"
+                  required
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 font-medium">MB</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Ukuran maksimum berkas unggahan bukti pembayaran yang diizinkan untuk customer (1-50 MB).
               </p>
             </div>
           </div>
@@ -187,6 +239,102 @@ export default function SettingsPage() {
                   />
                 </label>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Accounts Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <Landmark className="text-blue-500" />
+            <h2 className="text-lg font-bold text-slate-800">{t('bankAccountsSettings')}</h2>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            {/* List of existing bank accounts */}
+            <div className="space-y-3">
+              {(!formData.bankAccounts || formData.bankAccounts.length === 0) ? (
+                <p className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl text-center border border-dashed border-slate-200">
+                  Belum ada rekening bank yang terdaftar.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {formData.bankAccounts.map((bank) => (
+                    <div 
+                      key={bank.id} 
+                      className="p-4 bg-slate-50 border border-slate-250 rounded-2xl flex justify-between items-center shadow-sm"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-2 py-0.5 rounded-full uppercase">
+                          {bank.bankName}
+                        </span>
+                        <p className="text-base font-black text-slate-800 tracking-wider mt-1">{bank.accountNumber}</p>
+                        <p className="text-xs text-slate-550 font-semibold">a.n. {bank.accountHolder}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeBankAccount(bank.id)}
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                        title="Hapus Rekening"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Form to add new bank account */}
+            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/60 space-y-4">
+              <h3 className="text-xs text-slate-400 font-extrabold uppercase tracking-widest flex items-center">
+                <Plus size={14} className="mr-1.5" />
+                <span>{t('addBankAccount')}</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">{t('bankNameLabel')}</label>
+                  <input 
+                    type="text" 
+                    placeholder="Contoh: Bank BCA"
+                    value={newBank.bankName}
+                    onChange={(e) => setNewBank(prev => ({ ...prev, bankName: e.target.value }))}
+                    className="w-full px-3.5 py-2 border border-slate-250 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">{t('accountNumberLabel')}</label>
+                  <input 
+                    type="text" 
+                    placeholder="Contoh: 8015-xxxx-xx"
+                    value={newBank.accountNumber}
+                    onChange={(e) => setNewBank(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    className="w-full px-3.5 py-2 border border-slate-255 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">{t('accountHolderLabel')}</label>
+                  <input 
+                    type="text" 
+                    placeholder="Contoh: PT POS Sukses"
+                    value={newBank.accountHolder}
+                    onChange={(e) => setNewBank(prev => ({ ...prev, accountHolder: e.target.value }))}
+                    className="w-full px-3.5 py-2 border border-slate-250 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={addBankAccount}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center"
+                >
+                  <Plus size={14} className="mr-1.5" />
+                  <span>Tambahkan</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

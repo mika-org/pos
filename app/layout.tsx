@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
-import { AuthProvider } from "@/components/layout/AuthProvider";
+import { ClientLayout } from "@/components/layout/ClientLayout";
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "POS System - Offline First",
-  description: "Modern Offline-First Point of Sales System",
+  title: "RestoFlow POS - Smart & Premium Point of Sale",
+  description: "Modern Cloud-Synced Smart Point of Sale System for Restaurants",
 };
 
 export default function RootLayout({
@@ -22,18 +20,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
-        <AuthProvider>
-          <Toaster position="top-right" />
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto p-6">
-                {children}
-              </main>
-            </div>
-          </div>
-        </AuthProvider>
+        <Toaster position="top-right" />
+        <ClientLayout>{children}</ClientLayout>
         <Analytics />
       </body>
     </html>

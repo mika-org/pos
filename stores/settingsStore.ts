@@ -1,12 +1,21 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+}
+
 interface StoreSettings {
   storeName: string;
   storeAddress: string;
   storePhone: string;
   taxPercentage: number;
   qrisImage?: string;
+  maxFileSize: number;
+  bankAccounts: BankAccount[];
 }
 
 interface SettingsState {
@@ -16,6 +25,15 @@ interface SettingsState {
   updateSettings: (newSettings: Partial<StoreSettings>) => Promise<void>;
 }
 
+const defaultBankAccounts: BankAccount[] = [
+  {
+    id: 'default_bca',
+    bankName: 'Bank BCA',
+    accountNumber: '8015-3928-11',
+    accountHolder: 'PT POS Sukses Makmur'
+  }
+];
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {
     storeName: 'POS System',
@@ -23,6 +41,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     storePhone: '08123456789',
     taxPercentage: 0,
     qrisImage: '',
+    maxFileSize: 5,
+    bankAccounts: defaultBankAccounts,
   },
   isLoading: false,
   fetchSettings: async () => {
@@ -35,6 +55,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         .single();
 
       if (data && !error) {
+        let parsedBanks = [];
+        try {
+          parsedBanks = data.bank_accounts ? JSON.parse(data.bank_accounts) : [];
+        } catch (e) {
+          console.error("Failed to parse bank accounts JSON", e);
+        }
+
         set({
           settings: {
             storeName: data.storeName,
@@ -42,6 +69,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             storePhone: data.storePhone,
             taxPercentage: Number(data.taxPercentage),
             qrisImage: data.qrisImage || '',
+            maxFileSize: data.maxFileSize !== undefined && data.maxFileSize !== null ? Number(data.maxFileSize) : 5,
+            bankAccounts: parsedBanks && parsedBanks.length > 0 ? parsedBanks : defaultBankAccounts,
           }
         });
       } else if (error && error.code === 'PGRST116') {
@@ -54,6 +83,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           storePhone: defaultSettings.storePhone,
           taxPercentage: defaultSettings.taxPercentage,
           qrisImage: defaultSettings.qrisImage,
+          maxFileSize: defaultSettings.maxFileSize,
+          bank_accounts: JSON.stringify(defaultSettings.bankAccounts),
           updatedAt: Date.now()
         });
       }
@@ -76,6 +107,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           storePhone: updatedSettings.storePhone,
           taxPercentage: updatedSettings.taxPercentage,
           qrisImage: updatedSettings.qrisImage,
+          maxFileSize: updatedSettings.maxFileSize,
+          bank_accounts: JSON.stringify(updatedSettings.bankAccounts),
           updatedAt: Date.now()
         });
       if (error) {

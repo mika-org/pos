@@ -23,10 +23,15 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       login: (user) => set({ user, isAuthenticated: true }),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('pos_jwt_token');
+        }
+        set({ user: null, isAuthenticated: false });
+      },
     }),
     {
-      name: 'pos-auth-storage', // name of the item in the storage (must be unique)
+      name: 'pos-auth-storage',
     }
   )
 );

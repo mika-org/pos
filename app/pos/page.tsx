@@ -17,6 +17,7 @@ export default function POSPage() {
   const [completedTransaction, setCompletedTransaction] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'Transfer'>('Tunai');
+  const [activeTab, setActiveTab] = useState<'menu' | 'cart'>('menu');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { settings } = useSettingsStore();
   const { user } = useAuthStore();
@@ -33,20 +34,16 @@ export default function POSPage() {
   const fetchMasterData = async () => {
     setIsLoading(true);
     try {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('deleted', false);
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('deleted', false);
+      const [categoriesRes, productsRes] = await Promise.all([
+        supabase.from('categories').select('*').eq('deleted', false),
+        supabase.from('products').select('*').eq('deleted', false)
+      ]);
 
-      if (categoriesError) console.error(categoriesError);
-      if (productsError) console.error(productsError);
+      if (categoriesRes.error) console.error(categoriesRes.error);
+      if (productsRes.error) console.error(productsRes.error);
 
-      setCategories(categoriesData || []);
-      setAllProducts(productsData || []);
+      setCategories(categoriesRes.data || []);
+      setAllProducts(productsRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,9 +241,42 @@ export default function POSPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] -m-6">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] -m-6 overflow-hidden">
+      {/* Tab Switcher for Mobile/Tablet */}
+      <div className="flex bg-white border-b border-slate-200 lg:hidden shrink-0">
+        <button 
+          onClick={() => setActiveTab('menu')}
+          className={`flex-1 py-3 text-center font-bold text-sm border-b-2 transition-all ${
+            activeTab === 'menu' 
+              ? 'border-blue-600 text-blue-600 bg-blue-50/10' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Menu
+        </button>
+        <button 
+          onClick={() => setActiveTab('cart')}
+          className={`flex-1 py-3 text-center font-bold text-sm border-b-2 transition-all flex items-center justify-center space-x-1.5 ${
+            activeTab === 'cart' 
+              ? 'border-blue-600 text-blue-600 bg-blue-50/10' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span>Keranjang</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+            cart.length > 0 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-slate-100 text-slate-500'
+          }`}>
+            {cart.reduce((sum, item) => sum + item.qty, 0)}
+          </span>
+        </button>
+      </div>
+
       {/* Left Panel: Products */}
-      <div className="flex-1 flex flex-col bg-slate-50 border-r border-slate-200">
+      <div className={`flex-1 flex-col bg-slate-50 border-r border-slate-200 lg:flex ${
+        activeTab === 'menu' ? 'flex' : 'hidden'
+      }`}>
         <div className="p-4 bg-white border-b border-slate-200 shadow-sm z-10 flex flex-col space-y-4">
           <div className="flex items-center space-x-4">
             <div className="relative flex-1">
@@ -333,7 +363,9 @@ export default function POSPage() {
       </div>
 
       {/* Right Panel: Cart */}
-      <div className="w-96 bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 relative">
+      <div className={`w-full lg:w-96 bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 relative lg:flex ${
+        activeTab === 'cart' ? 'flex' : 'hidden'
+      }`}>
         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
           <h2 className="text-lg font-bold text-slate-800 flex items-center">
             <ShoppingCart size={20} className="mr-2 text-blue-600" />

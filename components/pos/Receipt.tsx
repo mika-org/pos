@@ -138,7 +138,7 @@ export function Receipt({ transaction, items }: ReceiptProps) {
       {/* QRIS Zoom Modal */}
       {qrisZoomOpen && settings.qrisImage && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 print:hidden"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 print:hidden"
           onClick={() => setQrisZoomOpen(false)}
           style={{ animation: 'fadeIn 0.2s ease' }}
         >
