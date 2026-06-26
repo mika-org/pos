@@ -5,6 +5,7 @@ import { Transaction } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { Download, Search, FileText, TrendingUp, Tag, Banknote } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -81,28 +82,118 @@ export default function ReportsPage() {
   const totalSubtotal = combinedItems.reduce((sum, item) => sum + item.subtotal, 0);
   const transactionCount = combinedItems.length;
 
-  const exportToCSV = () => {
-    const headers = ['No. Transaksi', 'Tanggal', 'Tipe / Sumber', 'Subtotal', 'Diskon', 'Total', 'Metode Bayar'];
-    const rows = combinedItems.map(item => [
-      item.no,
-      format(item.date, 'yyyy-MM-dd HH:mm:ss'),
-      item.type,
-      item.subtotal,
-      item.discount,
-      item.total,
-      item.paymentMethod
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    const reportDateStr = startDate === endDate 
+      ? format(new Date(startDate), 'dd MMMM yyyy')
+      : `${format(new Date(startDate), 'dd MMMM yyyy')} - ${format(new Date(endDate), 'dd MMMM yyyy')}`;
+
+    const data: any[][] = [
+      ['LAPORAN PENJUALAN - RESTOFLOW POS'],
+      ['Periode:', reportDateStr],
+      ['Tanggal Ekspor:', format(new Date(), 'dd MMMM yyyy HH:mm:ss')],
+      [],
+      ['RINGKASAN LAPORAN'],
+      ['Total Penjualan Kotor (Subtotal)', totalSubtotal],
+      ['Total Diskon', totalDiscount],
+      ['Total Pendapatan Bersih', totalRevenue],
+      ['Jumlah Transaksi', transactionCount],
+      [],
+      ['No. Transaksi', 'Tanggal & Waktu', 'Tipe / Sumber', 'Subtotal (Rp)', 'Diskon (Rp)', 'Total (Rp)', 'Metode Bayar'],
+    ];
+
+    combinedItems.forEach(item => {
+      data.push([
+        item.no.toUpperCase(),
+        format(item.date, 'yyyy-MM-dd HH:mm:ss'),
+        item.type,
+        item.subtotal,
+        item.discount,
+        item.total,
+        item.paymentMethod
+      ]);
+    });
+
+    data.push([]);
+    data.push([
+      'GRAND TOTAL',
+      '',
+      '',
+      totalSubtotal,
+      totalDiscount,
+      totalRevenue,
+      ''
     ]);
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }
+    ];
+
+    const currencyFormat = '"Rp"#,##0;("Rp"#,##0);"-"';
+    const integerFormat = '#,##0';
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+    const colWidths = [18, 22, 22, 16, 14, 16, 16];
+
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell_address = { c: C, r: R };
+        const cell_ref = XLSX.utils.encode_cell(cell_address);
+        const cell = ws[cell_ref];
+
+        if (!cell) continue;
+
+        const cellValueString = cell.v ? String(cell.v) : '';
+        if (cellValueString.length + 4 > colWidths[C]) {
+          colWidths[C] = cellValueString.length + 4;
+        }
+
+        if (R >= 5 && R <= 8) {
+          if (C === 1 && typeof cell.v === 'number') {
+            cell.t = 'n';
+            cell.z = R === 8 ? integerFormat : currencyFormat;
+          }
+        }
+
+        if (R >= 11 && R < 11 + combinedItems.length) {
+          if ((C === 3 || C === 4 || C === 5) && typeof cell.v === 'number') {
+            cell.t = 'n';
+            cell.z = currencyFormat;
+          }
+        }
+
+        if (R === 11 + combinedItems.length + 1) {
+          if ((C === 3 || C === 4 || C === 5) && typeof cell.v === 'number') {
+            cell.t = 'n';
+            cell.z = currencyFormat;
+          }
+        }
+      }
+    }
+
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Laporan Penjualan');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+
+    const s2ab = (s: string) => {
+      const buf = new ArrayBuffer(s.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < s.length; i++) {
+        view[i] = s.charCodeAt(i) & 0xFF;
+      }
+      return buf;
+    };
+
+    const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `laporan_penjualan_${format(new Date(), 'yyyyMMdd')}.csv`);
+    link.setAttribute('download', `Laporan_Penjualan_${startDate}_sd_${endDate}.xlsx`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -133,12 +224,12 @@ export default function ReportsPage() {
             />
           </div>
           <button 
-            onClick={exportToCSV}
+            onClick={exportToExcel}
             disabled={combinedItems.length === 0}
             className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             <Download size={16} />
-            <span>Export CSV</span>
+            <span>Export Excel</span>
           </button>
         </div>
       </div>
