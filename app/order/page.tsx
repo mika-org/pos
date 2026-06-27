@@ -41,7 +41,6 @@ function CustomerOrderFormContent() {
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
-  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [paymentProof, setPaymentProof] = useState<string>('');
   const [paymentProofName, setPaymentProofName] = useState<string>('');
@@ -919,24 +918,20 @@ function CustomerOrderFormContent() {
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3">Informasi Pembayaran</p>
 
                   {paymentMethod === 'qris' && (
-                    { paymentMethod === 'qris' && (
-                      <div className="space-y-4 flex flex-col items-center">
-                        <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
-                        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={settings.qrisImage || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POS_RESTO_QRIS_DUMMY'}
-                            alt="QRIS QR Code"
-                            className="w-36 h-36 object-contain"
-                          />
-                        </div>
-                        <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
-                          Total: Rp {getTotal().toLocaleString('id-ID')}
-                        </div>
+                    <div className="space-y-4 flex flex-col items-center">
+                      <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
+                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={settings.qrisImage || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POS_RESTO_QRIS_DUMMY'}
+                          alt="QRIS QR Code"
+                          className="w-36 h-36 object-contain"
+                        />
                       </div>
-                    )}
-
-                  {paymentMethod === 'bank_transfer' && (
+                      <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
+                        Total: Rp {getTotal().toLocaleString('id-ID')}
+                      </div>
+                    </div>
                   )}
 
                   {paymentMethod === 'bank_transfer' && (
