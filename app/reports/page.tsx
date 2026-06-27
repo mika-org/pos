@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabase';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { Download, Search, FileText, TrendingUp, Tag, Banknote, RefreshCw } from 'lucide-react';
 import { DateRangeFilter, DatePreset } from '@/components/ui/DateRangeFilter';
-import { 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
-  Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend 
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
+  Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import toast from 'react-hot-toast';
 
@@ -101,15 +101,15 @@ export default function ReportsPage() {
     const date = new Date(startTs + i * 24 * 60 * 60 * 1000);
     const start = startOfDay(date).getTime();
     const end = endOfDay(date).getTime();
-    
-    const dayRevenue = 
+
+    const dayRevenue =
       transactions
         .filter(tx => tx.date >= start && tx.date <= end)
         .reduce((sum, tx) => sum + tx.total, 0) +
       customerOrders
         .filter(co => co.created_at >= start && co.created_at <= end)
         .reduce((sum, co) => sum + co.total_amount, 0);
-      
+
     chartData.push({
       name: format(date, 'dd MMM'),
       revenue: dayRevenue
@@ -147,17 +147,17 @@ export default function ReportsPage() {
     try {
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
-      
+
       // Setup workbook properties
       workbook.creator = 'RestoFlow POS';
       workbook.lastModifiedBy = 'RestoFlow POS';
       workbook.created = new Date();
       workbook.modified = new Date();
-      
+
       // --- SHEET 1: RINGKASAN ---
       const summarySheet = workbook.addWorksheet('Ringkasan');
       summarySheet.views = [{ showGridLines: true }];
-      
+
       // Page Title
       summarySheet.mergeCells('A1:G1');
       const titleCell = summarySheet.getCell('A1');
@@ -170,7 +170,7 @@ export default function ReportsPage() {
         fgColor: { argb: 'FF1E293B' } // Slate-800
       };
       summarySheet.getRow(1).height = 40;
-      
+
       // Date Range Info
       summarySheet.mergeCells('A2:G2');
       const rangeCell = summarySheet.getCell('A2');
@@ -206,7 +206,7 @@ export default function ReportsPage() {
       summarySheet.getCell('E5').value = totalRevenue;
       summarySheet.getCell('E5').numFmt = '"Rp"#,##0';
       summarySheet.getCell('E5').font = { size: 14, bold: true, color: { argb: 'FF065F46' } }; // Emerald-800
-      
+
       const kpiCells = ['A4', 'A5', 'B4', 'B5', 'C4', 'C5', 'D4', 'D5', 'E4', 'E5', 'F4', 'F5', 'G4', 'G5'];
       kpiCells.forEach(cellRef => {
         const cell = summarySheet.getCell(cellRef);
@@ -267,11 +267,11 @@ export default function ReportsPage() {
       const pmHeaderCell = summarySheet.getCell('A11');
       pmHeaderCell.value = 'RINGKASAN METODE PEMBAYARAN';
       pmHeaderCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1E293B' } };
-      
+
       summarySheet.getCell('A12').value = 'Metode Pembayaran';
       summarySheet.getCell('B12').value = 'Jumlah Transaksi';
       summarySheet.getCell('C12').value = 'Total Pendapatan';
-      
+
       const pmHeaders = ['A12', 'B12', 'C12'];
       pmHeaders.forEach(cellRef => {
         const cell = summarySheet.getCell(cellRef);
@@ -310,12 +310,12 @@ export default function ReportsPage() {
         summarySheet.getCell(`A${currentPmRow}`).value = method;
         summarySheet.getCell(`B${currentPmRow}`).value = data.count;
         summarySheet.getCell(`C${currentPmRow}`).value = data.total;
-        
+
         summarySheet.getCell(`A${currentPmRow}`).alignment = { horizontal: 'left' };
         summarySheet.getCell(`B${currentPmRow}`).alignment = { horizontal: 'center' };
         summarySheet.getCell(`C${currentPmRow}`).alignment = { horizontal: 'right' };
         summarySheet.getCell(`C${currentPmRow}`).numFmt = '"Rp"#,##0';
-        
+
         ['A', 'B', 'C'].forEach(col => {
           const cell = summarySheet.getCell(`${col}${currentPmRow}`);
           cell.font = { size: 9 };
@@ -332,7 +332,7 @@ export default function ReportsPage() {
       summarySheet.getCell(`B${currentPmRow}`).value = { formula: `=SUM(B13:B${currentPmRow - 1})` };
       summarySheet.getCell(`C${currentPmRow}`).value = { formula: `=SUM(C13:C${currentPmRow - 1})` };
       summarySheet.getCell(`C${currentPmRow}`).numFmt = '"Rp"#,##0';
-      
+
       ['A', 'B', 'C'].forEach(col => {
         const cell = summarySheet.getCell(`${col}${currentPmRow}`);
         cell.font = { size: 9, bold: true };
@@ -354,7 +354,7 @@ export default function ReportsPage() {
       summarySheet.getCell('E12').value = 'Sumber Pesanan';
       summarySheet.getCell('F12').value = 'Jumlah Transaksi';
       summarySheet.getCell('G12').value = 'Total Pendapatan';
-      
+
       const srcHeaders = ['E12', 'F12', 'G12'];
       srcHeaders.forEach(cellRef => {
         const cell = summarySheet.getCell(cellRef);
@@ -386,12 +386,12 @@ export default function ReportsPage() {
         summarySheet.getCell(`E${currentSrcRow}`).value = src;
         summarySheet.getCell(`F${currentSrcRow}`).value = data.count;
         summarySheet.getCell(`G${currentSrcRow}`).value = data.total;
-        
+
         summarySheet.getCell(`E${currentSrcRow}`).alignment = { horizontal: 'left' };
         summarySheet.getCell(`F${currentSrcRow}`).alignment = { horizontal: 'center' };
         summarySheet.getCell(`G${currentSrcRow}`).alignment = { horizontal: 'right' };
         summarySheet.getCell(`G${currentSrcRow}`).numFmt = '"Rp"#,##0';
-        
+
         ['E', 'F', 'G'].forEach(col => {
           const cell = summarySheet.getCell(`${col}${currentSrcRow}`);
           cell.font = { size: 9 };
@@ -408,7 +408,7 @@ export default function ReportsPage() {
       summarySheet.getCell(`F${currentSrcRow}`).value = { formula: `=SUM(F13:F${currentSrcRow - 1})` };
       summarySheet.getCell(`G${currentSrcRow}`).value = { formula: `=SUM(G13:G${currentSrcRow - 1})` };
       summarySheet.getCell(`G${currentSrcRow}`).numFmt = '"Rp"#,##0';
-      
+
       ['E', 'F', 'G'].forEach(col => {
         const cell = summarySheet.getCell(`${col}${currentSrcRow}`);
         cell.font = { size: 9, bold: true };
@@ -469,17 +469,17 @@ export default function ReportsPage() {
         row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
         row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
-        
+
         row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
         row.getCell(4).numFmt = '"Rp"#,##0';
-        
+
         row.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
         row.getCell(5).numFmt = '"Rp"#,##0';
-        
+
         row.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
         row.getCell(6).numFmt = '"Rp"#,##0';
         row.getCell(6).font = { bold: true, color: { argb: 'FF047857' } };
-        
+
         row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
 
         const isEven = idx % 2 === 0;
@@ -528,7 +528,7 @@ export default function ReportsPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('Laporan Excel (.xlsx) berhasil diunduh!');
     } catch (err) {
       console.error('Gagal mengekspor ke Excel:', err);
@@ -545,16 +545,16 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold text-slate-800">Laporan Penjualan</h1>
           <p className="text-slate-500 text-sm">Lihat ringkasan dan unduh data transaksi.</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
-          <DateRangeFilter 
-            startDate={startDate} 
-            endDate={endDate} 
-            selectedPreset={preset} 
+          <DateRangeFilter
+            startDate={startDate}
+            endDate={endDate}
+            selectedPreset={preset}
             onChange={(start, end, pr) => { setStartDate(start); setEndDate(end); setPreset(pr); }}
             showAllTime={true}
           />
-          <button 
+          <button
             onClick={exportToExcel}
             disabled={combinedItems.length === 0 || isExporting}
             className="flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
@@ -627,20 +627,20 @@ export default function ReportsPage() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRevenueReports" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} dy={10} />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} 
-                    tickFormatter={(val) => `Rp ${(val/1000)}k`} 
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }}
+                    tickFormatter={(val) => `Rp ${(val / 1000)}k`}
                     dx={-10}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: any) => [`Rp ${Number(value || 0).toLocaleString('id-ID')}`, 'Pendapatan']}
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontFamily: 'inherit', fontSize: '12px' }}
                   />
@@ -678,13 +678,13 @@ export default function ReportsPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: any) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`}
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)', fontSize: '11px' }}
                   />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36} 
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
                     iconType="circle"
                     formatter={(value) => <span className="text-[11px] font-bold text-slate-600">{value}</span>}
                   />
@@ -731,11 +731,10 @@ export default function ReportsPage() {
                     <td className="px-6 py-3 font-medium text-slate-800 select-all uppercase text-xs tracking-wider">{item.no}</td>
                     <td className="px-6 py-3 text-slate-600">{format(item.date, 'dd MMM yyyy, HH:mm')}</td>
                     <td className="px-6 py-3">
-                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                        item.type.includes('Meja') ? 'bg-blue-100 text-blue-800' :
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${item.type.includes('Meja') ? 'bg-blue-100 text-blue-800' :
                         item.type.includes('Takeaway') ? 'bg-amber-100 text-amber-800' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
+                          'bg-slate-100 text-slate-700'
+                        }`}>
                         {item.type}
                       </span>
                     </td>

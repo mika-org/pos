@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Product, Category, DiningTable, CustomerOrder } from '@/lib/db';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/stores/languageStore';
-import { 
-  User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
+import {
+  User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check,
   Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
   Banknote
 } from 'lucide-react';
@@ -41,6 +41,7 @@ function CustomerOrderFormContent() {
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
+  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [paymentProof, setPaymentProof] = useState<string>('');
   const [paymentProofName, setPaymentProofName] = useState<string>('');
@@ -58,7 +59,7 @@ function CustomerOrderFormContent() {
   // Fetch Master Data & Settings on Mount
   useEffect(() => {
     fetchSettings();
-    
+
     const loadMasterData = async () => {
       try {
         const [tablesRes, categoriesRes, productsRes] = await Promise.all([
@@ -74,7 +75,7 @@ function CustomerOrderFormContent() {
         console.error('Failed to load menu data:', err);
       }
     };
-    
+
     loadMasterData();
   }, []);
 
@@ -239,7 +240,7 @@ function CustomerOrderFormContent() {
       // Print simulations
       console.log(t('simEmailSentCustomer', { email: customerEmail, id: orderId, status: 'Pending Confirmation' }));
       console.log(t('simAdminNotification', { id: orderId, name: customerName, total: getTotal().toLocaleString('id-ID') }));
-      
+
       toast.success(t('orderSuccess'));
 
       // Show Simulation Banner to make it extremely visual!
@@ -320,7 +321,7 @@ function CustomerOrderFormContent() {
           products ( name )
         `)
         .eq('order_id', orderData.id);
-      
+
       const mappedItems = (itemsData || []).map(item => {
         const prodName = (item as any).products?.name || 'Unknown Product';
         return {
@@ -377,7 +378,7 @@ function CustomerOrderFormContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased text-slate-800">
-      
+
       {/* Top Navbar Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -392,7 +393,7 @@ function CustomerOrderFormContent() {
 
         <div className="flex items-center space-x-2">
           {step !== 5 && (
-            <button 
+            <button
               onClick={() => {
                 setIsTrackingMode(!isTrackingMode);
                 setTrackedOrder(null);
@@ -403,8 +404,8 @@ function CustomerOrderFormContent() {
               {isTrackingMode ? t('newOrder') : "Lacak Pesanan"}
             </button>
           )}
-          
-          <button 
+
+          <button
             onClick={() => setLanguage(language === 'id' ? 'en' : 'id')}
             className="flex items-center space-x-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-100/80 rounded-xl transition-all text-xs font-extrabold select-none cursor-pointer"
           >
@@ -416,7 +417,7 @@ function CustomerOrderFormContent() {
 
       {/* Main Panel Content */}
       <main className="flex-1 max-w-xl w-full mx-auto p-4 md:py-8">
-        
+
         {/* --- TRACKING MODE VIEW --- */}
         {isTrackingMode ? (
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden p-6 space-y-6 animate-in fade-in duration-300">
@@ -429,14 +430,14 @@ function CustomerOrderFormContent() {
             </div>
 
             <form onSubmit={handleTrackLookup} className="flex space-x-2">
-              <input 
-                type="text" 
-                placeholder="Contoh: ORD-12345" 
+              <input
+                type="text"
+                placeholder="Contoh: ORD-12345"
                 value={trackingIdInput}
                 onChange={(e) => setTrackingIdInput(e.target.value)}
                 className="flex-1 px-4 py-3 border border-slate-250 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold uppercase text-slate-800 tracking-wider text-center"
               />
-              <button 
+              <button
                 type="submit"
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-extrabold px-6 py-3 rounded-2xl transition-colors cursor-pointer shadow-md shadow-blue-500/10 text-sm tracking-wide uppercase"
@@ -472,7 +473,7 @@ function CustomerOrderFormContent() {
                 {/* Status Stepper Tracker */}
                 <div className="space-y-4 bg-slate-50/50 p-6 rounded-3xl border border-slate-200/50">
                   <h3 className="font-black text-slate-800 text-sm tracking-tight">Timeline Progres</h3>
-                  
+
                   {trackedOrder.status === 'rejected' ? (
                     <div className="bg-rose-50 border border-rose-200/60 p-4 rounded-2xl text-rose-800 text-sm space-y-2 animate-in zoom-in duration-300">
                       <p className="font-bold">🚫 Pembayaran Ditolak</p>
@@ -482,10 +483,9 @@ function CustomerOrderFormContent() {
                     <div className="relative pl-6 space-y-6 before:absolute before:left-[35px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200">
                       {/* Step 1 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                          ['pending_confirmation', 'preparing', 'delivery', 'finished'].includes(trackedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${['pending_confirmation', 'preparing', 'delivery', 'finished'].includes(trackedOrder.status)
                             ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -503,10 +503,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 2 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                          ['preparing', 'delivery', 'finished'].includes(trackedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${['preparing', 'delivery', 'finished'].includes(trackedOrder.status)
                             ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -517,10 +516,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 3 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                          ['delivery', 'finished'].includes(trackedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${['delivery', 'finished'].includes(trackedOrder.status)
                             ? 'bg-purple-500 border-purple-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -531,10 +529,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 4 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                          trackedOrder.status === 'finished'
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${trackedOrder.status === 'finished'
                             ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -569,22 +566,21 @@ function CustomerOrderFormContent() {
             )}
           </div>
         ) : (
-          
+
           /* --- WIZARD FORM MODE --- */
           <div className="bg-white rounded-3xl border border-slate-250/60 shadow-xl overflow-hidden">
-            
+
             {/* Steps linear status bar */}
             {step < 5 && (
               <div className="bg-slate-950/95 px-6 py-4 flex items-center justify-between border-b border-slate-800">
                 {[1, 2, 3, 4].map(s => (
                   <div key={s} className="flex items-center">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs border-2 transition-all duration-300 ${
-                      step === s 
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20' 
-                        : step > s 
-                          ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs border-2 transition-all duration-300 ${step === s
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                        : step > s
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
                           : 'border-slate-800 text-slate-500 bg-slate-900'
-                    }`}>
+                      }`}>
                       {step > s ? <Check size={13} className="stroke-3" /> : s}
                     </span>
                     {s < 4 && <div className={`w-10 sm:w-16 h-0.5 mx-1 sm:mx-2 rounded ${step > s ? 'bg-emerald-500' : 'bg-slate-900'}`} />}
@@ -608,8 +604,8 @@ function CustomerOrderFormContent() {
                       <User size={14} className="text-slate-400 mr-2" />
                       {t('customerName')} <span className="text-rose-500 ml-0.5">*</span>
                     </label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
                       placeholder={t('customerNamePlaceholder')}
                       value={customerName}
@@ -624,8 +620,8 @@ function CustomerOrderFormContent() {
                       <Mail size={14} className="text-slate-400 mr-2" />
                       {t('customerEmail')} <span className="text-rose-500 ml-0.5">*</span>
                     </label>
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       required
                       placeholder={t('customerEmailPlaceholder')}
                       value={customerEmail}
@@ -639,7 +635,7 @@ function CustomerOrderFormContent() {
                     <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
                       {t('diningTable')}
                     </label>
-                    
+
                     {tableParam && selectedTableObj ? (
                       <div className="bg-linear-to-tr from-blue-50 to-indigo-50 border border-blue-200/80 p-4 rounded-2xl flex items-center justify-between shadow-sm animate-in zoom-in duration-300">
                         <div>
@@ -666,7 +662,7 @@ function CustomerOrderFormContent() {
                   </div>
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   className="w-full bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-4 rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-center transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/30 cursor-pointer"
                 >
@@ -684,11 +680,11 @@ function CustomerOrderFormContent() {
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('stepProducts')}</h2>
                     <span className="bg-blue-50 text-blue-700 text-xs font-black px-3 py-1 rounded-full border border-blue-100 shadow-sm">{getCartCount()} Menu</span>
                   </div>
-                  
+
                   {/* Search Bar */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={15} />
-                    <input 
+                    <input
                       type="text"
                       placeholder={t('searchProducts')}
                       value={searchQuery}
@@ -701,11 +697,10 @@ function CustomerOrderFormContent() {
                   <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                     <button
                       onClick={() => setActiveCategory('all')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer border ${
-                        activeCategory === 'all' 
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer border ${activeCategory === 'all'
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                           : 'bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200/80'
-                      }`}
+                        }`}
                     >
                       {t('allCategories')}
                     </button>
@@ -713,11 +708,10 @@ function CustomerOrderFormContent() {
                       <button
                         key={cat.id}
                         onClick={() => setActiveCategory(cat.id!)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer border ${
-                          activeCategory === cat.id 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer border ${activeCategory === cat.id
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                             : 'bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200/80'
-                        }`}
+                          }`}
                       >
                         {cat.name}
                       </button>
@@ -757,14 +751,14 @@ function CustomerOrderFormContent() {
                           {/* Cart Add/Minus buttons */}
                           {cartItem ? (
                             <div className="flex items-center bg-blue-600 text-white rounded-xl p-1 shadow-sm">
-                              <button 
+                              <button
                                 onClick={() => updateCartQty(p, -1)}
                                 className="p-1 hover:bg-blue-700 rounded-lg cursor-pointer"
                               >
                                 <Minus size={13} className="stroke-3" />
                               </button>
                               <span className="px-3.5 font-black text-xs">{cartItem.qty}</span>
-                              <button 
+                              <button
                                 onClick={() => updateCartQty(p, 1)}
                                 className="p-1 hover:bg-blue-700 rounded-lg cursor-pointer"
                               >
@@ -787,14 +781,14 @@ function CustomerOrderFormContent() {
 
                 {/* Footer Controls */}
                 <div className="shrink-0 pt-3 border-t border-slate-100 flex justify-between space-x-3">
-                  <button 
+                  <button
                     onClick={() => setStep(1)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >
                     <ArrowLeft size={14} className="mr-1.5" />
                     <span>Kembali</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (getCartCount() === 0) {
                         toast.error(t('selectProductError'));
@@ -829,7 +823,7 @@ function CustomerOrderFormContent() {
                       <p className="font-black text-slate-900">Rp {(item.qty * item.product.sellPrice).toLocaleString('id-ID')}</p>
                     </div>
                   ))}
-                  
+
                   {/* Calculations */}
                   <div className="p-4 bg-slate-50 space-y-2 text-sm text-slate-600">
                     <div className="flex justify-between">
@@ -857,14 +851,14 @@ function CustomerOrderFormContent() {
 
                 {/* Footer Controls */}
                 <div className="pt-4 border-t border-slate-100 flex justify-between space-x-3">
-                  <button 
+                  <button
                     onClick={() => setStep(2)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >
                     <ArrowLeft size={14} className="mr-1.5" />
                     <span>Kembali</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => setStep(4)}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-xl flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider shadow-md shadow-blue-500/15"
                   >
@@ -888,11 +882,10 @@ function CustomerOrderFormContent() {
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('qris'); setPaymentProof(''); setPaymentProofName(''); }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center space-y-2 cursor-pointer transition-all ${
-                      paymentMethod === 'qris' 
-                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                    className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center space-y-1.5 cursor-pointer transition-all ${paymentMethod === 'qris'
+                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm'
                         : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <QrCode size={22} />
                     <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS</span>
@@ -900,11 +893,10 @@ function CustomerOrderFormContent() {
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('bank_transfer'); setPaymentProof(''); setPaymentProofName(''); }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center space-y-2 cursor-pointer transition-all ${
-                      paymentMethod === 'bank_transfer' 
-                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                    className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center space-y-1.5 cursor-pointer transition-all ${paymentMethod === 'bank_transfer'
+                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm'
                         : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <FileText size={22} />
                     <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">Transfer</span>
@@ -912,11 +904,10 @@ function CustomerOrderFormContent() {
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('cashier'); setPaymentProof('cashier'); setPaymentProofName(''); }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center space-y-2 cursor-pointer transition-all ${
-                      paymentMethod === 'cashier' 
-                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center space-y-2 cursor-pointer transition-all ${paymentMethod === 'cashier'
+                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm'
                         : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     <Banknote size={22} />
                     <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">Ke Kasir</span>
@@ -926,28 +917,32 @@ function CustomerOrderFormContent() {
                 {/* Instructions Container */}
                 <div className="p-4 bg-slate-50/60 border border-slate-250/60 rounded-3xl flex flex-col items-center text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3">Informasi Pembayaran</p>
-                  
+
                   {paymentMethod === 'qris' && (
-                    <div className="space-y-4 flex flex-col items-center">
-                      <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
-                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src={settings.qrisImage || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POS_RESTO_QRIS_DUMMY'} 
-                          alt="QRIS QR Code" 
-                          className="w-36 h-36 object-contain"
-                        />
+                    { paymentMethod === 'qris' && (
+                      <div className="space-y-4 flex flex-col items-center">
+                        <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
+                        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={settings.qrisImage || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POS_RESTO_QRIS_DUMMY'}
+                            alt="QRIS QR Code"
+                            className="w-36 h-36 object-contain"
+                          />
+                        </div>
+                        <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
+                          Total: Rp {getTotal().toLocaleString('id-ID')}
+                        </div>
                       </div>
-                      <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
-                        Total: Rp {getTotal().toLocaleString('id-ID')}
-                      </div>
-                    </div>
+                    )}
+
+                  {paymentMethod === 'bank_transfer' && (
                   )}
 
                   {paymentMethod === 'bank_transfer' && (
                     <div className="space-y-4 w-full">
                       <p className="text-xs text-slate-500 font-semibold">{t('bankTransferDesc')}</p>
-                      
+
                       {!settings.bankAccounts || settings.bankAccounts.length === 0 ? (
                         <p className="text-sm text-rose-600 bg-rose-50 p-4 rounded-2xl text-center border border-dashed border-rose-200">
                           {t('noBankAccounts')}
@@ -961,14 +956,13 @@ function CustomerOrderFormContent() {
                             {settings.bankAccounts.map((bank) => {
                               const isSelected = selectedBankId === bank.id;
                               return (
-                                <div 
+                                <div
                                   key={bank.id}
                                   onClick={() => setSelectedBankId(bank.id)}
-                                  className={`p-4 rounded-2xl border-2 text-left cursor-pointer transition-all relative ${
-                                    isSelected 
-                                      ? 'border-blue-600 bg-blue-50/30' 
+                                  className={`p-4 rounded-2xl border-2 text-left cursor-pointer transition-all relative ${isSelected
+                                      ? 'border-blue-600 bg-blue-50/30'
                                       : 'border-slate-200 bg-white hover:bg-slate-50'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex justify-between items-start">
                                     <div className="space-y-1">
@@ -1006,7 +1000,7 @@ function CustomerOrderFormContent() {
                           </div>
                         </div>
                       )}
-                      
+
                       <div className="bg-blue-50/80 inline-block px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
                         Total: Rp {getTotal().toLocaleString('id-ID')}
                       </div>
@@ -1032,15 +1026,44 @@ function CustomerOrderFormContent() {
                 {paymentMethod !== 'cashier' && (
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
-                    
+
                     <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-white rounded-2xl p-6 transition-all duration-300 text-center shadow-sm">
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/png, image/jpeg, image/jpg, application/pdf"
                         onChange={handleFileChange}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
-                      
+
+                      <div className="space-y-2 flex flex-col items-center">
+                        <Upload size={32} className="text-slate-400 animate-bounce" style={{ animationDuration: '2s' }} />
+                        {paymentProofName ? (
+                          <div className="flex items-center space-x-1.5 text-emerald-600 font-black animate-in zoom-in duration-300">
+                            <CheckCircle size={16} />
+                            <span className="text-sm truncate max-w-[240px]">{paymentProofName}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-bold text-slate-700">{t('dragDrop')}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{t('uploadProofDesc', { size: settings.maxFileSize || 5 })}</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {paymentMethod !== 'cashier' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
+
+                    <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-white rounded-2xl p-6 transition-all duration-300 text-center shadow-sm">
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, application/pdf"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+
                       <div className="space-y-2 flex flex-col items-center">
                         <Upload size={32} className="text-slate-400 animate-bounce" style={{ animationDuration: '2s' }} />
                         {paymentProofName ? (
@@ -1061,7 +1084,7 @@ function CustomerOrderFormContent() {
 
                 {/* Footer Controls */}
                 <div className="pt-4 border-t border-slate-100 flex justify-between space-x-3">
-                  <button 
+                  <button
                     onClick={() => setStep(3)}
                     disabled={loading}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold py-3.5 rounded-xl flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
@@ -1069,7 +1092,7 @@ function CustomerOrderFormContent() {
                     <ArrowLeft size={14} className="mr-1.5" />
                     <span>Kembali</span>
                   </button>
-                  <button 
+                  <button
                     onClick={handleSubmitOrder}
                     disabled={loading || (paymentMethod !== 'cashier' && !paymentProof)}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl shadow-md shadow-emerald-500/15 flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
@@ -1094,11 +1117,11 @@ function CustomerOrderFormContent() {
                 <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-md">
                   <CheckCircle size={32} />
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('orderSuccess')}</h2>
                   <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto">
-                    {submittedOrder.payment_method === 'cashier' 
+                    {submittedOrder.payment_method === 'cashier'
                       ? t('orderSuccessCashierDesc')
                       : t('orderSuccessDesc')
                     }
@@ -1110,14 +1133,14 @@ function CustomerOrderFormContent() {
                   <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest">{t('orderIdLabel')}</p>
                   <div className="flex items-center justify-center space-x-2 mt-1">
                     <p className="text-2xl font-black text-slate-900 tracking-wider uppercase select-all">{submittedOrderId}</p>
-                    <button 
+                    <button
                       onClick={() => {
                         if (submittedOrderId) {
                           navigator.clipboard.writeText(submittedOrderId);
                           toast.success("ID disalin!");
                         }
                       }}
-                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                      className="p-1.5 hover:bg-slate-250 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                       title="Copy"
                     >
                       <Copy size={13} />
@@ -1147,10 +1170,9 @@ function CustomerOrderFormContent() {
                     <div className="relative pl-6 space-y-6 before:absolute before:left-[35px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200">
                       {/* Step 1 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                          ['pending_confirmation', 'preparing', 'delivery', 'finished'].includes(submittedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${['pending_confirmation', 'preparing', 'delivery', 'finished'].includes(submittedOrder.status)
                             ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -1158,8 +1180,8 @@ function CustomerOrderFormContent() {
                             {submittedOrder.payment_method === 'cashier' ? 'Belum Bayar' : t('pending_confirmation')}
                           </p>
                           <p className="text-[10px] text-slate-400 mt-1">
-                            {submittedOrder.payment_method === 'cashier' 
-                              ? 'Harap lakukan pembayaran di meja kasir' 
+                            {submittedOrder.payment_method === 'cashier'
+                              ? 'Harap lakukan pembayaran di meja kasir'
                               : 'Bukti bayar sedang dicek kasir'
                             }
                           </p>
@@ -1168,10 +1190,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 2 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                          ['preparing', 'delivery', 'finished'].includes(submittedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${['preparing', 'delivery', 'finished'].includes(submittedOrder.status)
                             ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -1182,10 +1203,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 3 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                          ['delivery', 'finished'].includes(submittedOrder.status)
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${['delivery', 'finished'].includes(submittedOrder.status)
                             ? 'bg-purple-500 border-purple-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -1196,10 +1216,9 @@ function CustomerOrderFormContent() {
 
                       {/* Step 4 */}
                       <div className="relative flex items-start pl-8">
-                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                          submittedOrder.status === 'finished'
+                        <span className={`absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${submittedOrder.status === 'finished'
                             ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
-                        }`}>
+                          }`}>
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
@@ -1221,7 +1240,7 @@ function CustomerOrderFormContent() {
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 max-w-xs mx-auto">
-                  <button 
+                  <button
                     onClick={handleResetOrder}
                     className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold py-3.5 rounded-xl transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >

@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { CustomerOrder, DiningTable, AppUser } from '@/lib/db';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/stores/languageStore';
-import { 
-  Search, Eye, Check, X, Clipboard, ArrowRight, Download, 
+import {
+  Search, Eye, Check, X, Clipboard, ArrowRight, Download,
   ChevronLeft, ChevronRight, FileText, CheckCircle, Clock, Info, ShieldAlert,
   Banknote
 } from 'lucide-react';
@@ -19,7 +19,7 @@ function AdminOrdersPageContent() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuthStore();
   const searchParams = useSearchParams();
-  
+
   // Date filter State
   const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -34,7 +34,7 @@ function AdminOrdersPageContent() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'pending_confirmation' | 'preparing' | 'delivery' | 'finished' | 'rejected'>('all');
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -43,7 +43,7 @@ function AdminOrdersPageContent() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
-  
+
   // Rejection input state
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -52,7 +52,7 @@ function AdminOrdersPageContent() {
     setIsLoading(true);
     try {
       let query = supabase.from('customer_orders').select('*');
-      
+
       if (startDate && endDate) {
         const startTs = startOfDay(new Date(startDate)).getTime();
         const endTs = endOfDay(new Date(endDate)).getTime();
@@ -66,7 +66,7 @@ function AdminOrdersPageContent() {
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
-      
+
       setTables(tablesRes.data || []);
       setUsers(usersRes.data || []);
       setOrders(ordersRes.data || []);
@@ -161,7 +161,7 @@ function AdminOrdersPageContent() {
     try {
       const now = Date.now();
       const updatedStatus = 'preparing';
-      
+
       const { error } = await supabase
         .from('customer_orders')
         .update({
@@ -176,7 +176,7 @@ function AdminOrdersPageContent() {
 
       console.log(t('simEmailStatusChanged', { email: order.customer_email, id: order.id, status: 'Preparing' }));
       toast.success(t('successApprove'));
-      
+
       // Visual notification simulator popups
       toast(`📧 [Simulasi] Email notifikasi Pembayaran Diterima dikirim ke ${order.customer_email}`, { icon: '✉️', duration: 4000 });
 
@@ -215,7 +215,7 @@ function AdminOrdersPageContent() {
 
       console.log(t('simEmailStatusChanged', { email: selectedOrder.customer_email, id: selectedOrder.id, status: 'Rejected' }));
       toast.success(t('successReject'));
-      
+
       // Visual notification simulator popups
       toast(`📧 [Simulasi] Email penolakan pembayaran dikirim ke ${selectedOrder.customer_email}`, { icon: '✉️', duration: 4000 });
 
@@ -243,7 +243,7 @@ function AdminOrdersPageContent() {
 
       console.log(t('simEmailStatusChanged', { email: order.customer_email, id: order.id, status: nextStatus }));
       toast.success(t('successUpdateStatus'));
-      
+
       // Visual notification simulator popups
       toast(`📧 [Simulasi] Email notifikasi Progres (${t(nextStatus as any)}) dikirim ke ${order.customer_email}`, { icon: '✉️', duration: 4000 });
 
@@ -259,14 +259,14 @@ function AdminOrdersPageContent() {
     try {
       const link = document.createElement('a');
       link.href = order.payment_proof;
-      
+
       let extension = 'png';
       if (order.payment_proof.includes('pdf')) {
         extension = 'pdf';
       } else if (order.payment_proof.includes('jpeg') || order.payment_proof.includes('jpg')) {
         extension = 'jpg';
       }
-      
+
       link.download = `bukti_bayar_${order.id}.${extension}`;
       document.body.appendChild(link);
       link.click();
@@ -295,11 +295,11 @@ function AdminOrdersPageContent() {
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
-    const matchesSearch = 
-      o.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch =
+      o.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.id.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     const matchesTab = activeTab === 'all' || o.status === activeTab;
     return matchesSearch && matchesTab;
   });
@@ -365,10 +365,10 @@ function AdminOrdersPageContent() {
           <h3 className="text-xs font-black text-slate-850 tracking-tight uppercase">Filter Tanggal Pesanan</h3>
           <p className="text-[11px] text-slate-400 font-bold mt-0.5">Saring pesanan masuk berdasarkan tanggal transfer/dibuat.</p>
         </div>
-        <DateRangeFilter 
-          startDate={startDate} 
-          endDate={endDate} 
-          selectedPreset={preset} 
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          selectedPreset={preset}
           onChange={(start, end, pr) => { setStartDate(start); setEndDate(end); setPreset(pr); setCurrentPage(1); }}
           showAllTime={true}
         />
@@ -382,18 +382,16 @@ function AdminOrdersPageContent() {
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
-              className={`px-4 py-2.5 border-b-2 font-bold text-sm transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-                activeTab === tab 
-                  ? 'border-blue-600 text-blue-600' 
+              className={`px-4 py-2.5 border-b-2 font-bold text-sm transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${activeTab === tab
+                  ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+                }`}
             >
               <span>{tab === 'all' ? t('allStatus') : t(tab as any)}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                activeTab === tab 
-                  ? 'bg-blue-100 text-blue-800' 
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${activeTab === tab
+                  ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-100 text-slate-500'
-              }`}>
+                }`}>
                 {count}
               </span>
             </button>
@@ -406,8 +404,8 @@ function AdminOrdersPageContent() {
         <div className="p-4 border-b border-slate-200/80 flex items-center">
           <div className="relative w-full max-w-md">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder={t('searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
@@ -442,8 +440,8 @@ function AdminOrdersPageContent() {
                 </tr>
               ) : (
                 paginatedOrders.map((order) => (
-                  <tr 
-                    key={order.id} 
+                  <tr
+                    key={order.id}
                     className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${getStatusBorderClass(order.status)}`}
                   >
                     <td className="p-4 font-extrabold text-slate-900 uppercase text-xs tracking-wider select-all pl-4">{order.id}</td>
@@ -454,9 +452,8 @@ function AdminOrdersPageContent() {
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                        order.table_id ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${order.table_id ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
                         {getTableName(order.table_id)}
                       </span>
                     </td>
@@ -469,7 +466,7 @@ function AdminOrdersPageContent() {
                       {new Date(order.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td className="p-4 flex justify-center">
-                      <button 
+                      <button
                         onClick={() => handleOpenDetail(order)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all cursor-pointer shadow-sm hover:shadow active:scale-95"
                         title={t('viewDetails')}
@@ -514,7 +511,7 @@ function AdminOrdersPageContent() {
       {isDetailOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-end z-50 animate-in fade-in duration-200">
           <div className="bg-white h-screen w-full max-w-lg shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            
+
             {/* Modal Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
               <div>
@@ -527,7 +524,7 @@ function AdminOrdersPageContent() {
                   {new Date(selectedOrder.created_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })}
                 </p>
               </div>
-              <button 
+              <button
                 onClick={handleCloseDetail}
                 className="p-2 hover:bg-slate-200/80 rounded-xl text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               >
@@ -537,14 +534,14 @@ function AdminOrdersPageContent() {
 
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              
+
               {/* Customer Info Card */}
               <div className="p-4 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-3.5 shadow-sm">
                 <div className="flex items-center space-x-2 border-b border-slate-150 pb-2">
                   <Info size={14} className="text-slate-400" />
                   <h3 className="text-xs text-slate-500 font-black uppercase tracking-wider">Detail Customer & Lokasi</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
                   <div>
                     <p className="text-slate-400">Nama Customer</p>
@@ -617,7 +614,7 @@ function AdminOrdersPageContent() {
                     {selectedOrder.payment_method === 'cashier' ? 'Metode Pembayaran' : t('paymentProofPreview')}
                   </h3>
                   {selectedOrder.payment_method !== 'cashier' && (
-                    <button 
+                    <button
                       onClick={() => handleDownloadProof(selectedOrder)}
                       className="text-xs text-blue-600 font-bold hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
                     >
@@ -642,7 +639,7 @@ function AdminOrdersPageContent() {
                     <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[280px]">
                       <FileText className="mx-auto text-rose-500" size={48} />
                       <p className="text-xs font-bold text-slate-700">Berkas Dokumen PDF</p>
-                      <button 
+                      <button
                         onClick={() => {
                           const w = window.open();
                           w?.document.write(`<iframe src="${selectedOrder.payment_proof}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
@@ -654,9 +651,9 @@ function AdminOrdersPageContent() {
                     </div>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={selectedOrder.payment_proof} 
-                      alt="Payment Proof" 
+                    <img
+                      src={selectedOrder.payment_proof}
+                      alt="Payment Proof"
                       className="max-w-full max-h-[300px] rounded-xl object-contain border border-slate-100 cursor-pointer shadow-sm hover:scale-[1.02] transition-transform duration-300"
                       onClick={() => {
                         const w = window.open();
@@ -671,7 +668,7 @@ function AdminOrdersPageContent() {
 
             {/* Modal Actions Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50 shrink-0">
-              
+
               {/* REJECTION FORM */}
               {isRejecting ? (
                 <form onSubmit={handleRejectSubmit} className="space-y-3.5 animate-in slide-in-from-bottom duration-250">
@@ -705,7 +702,7 @@ function AdminOrdersPageContent() {
               ) : (
                 /* MAIN FLOW BUTTONS */
                 <div className="flex space-x-2">
-                  
+
                   {/* Step 1: Verify */}
                   {selectedOrder.status === 'pending_confirmation' && (
                     <>

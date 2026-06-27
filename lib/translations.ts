@@ -62,6 +62,12 @@ export const translations = {
     fileTooLarge: "Ukuran berkas melebihi batas {size}MB!",
     fileInvalidType: "Tipe berkas tidak didukung! Hanya JPG, JPEG, PNG, dan PDF.",
     proofRequired: "Bukti pembayaran wajib diunggah untuk mengirim pesanan.",
+    payAtCashier: "Bayar di Kasir",
+    cashierDesc: "Silakan lanjutkan pemesanan Anda. Setelah dikirim, Anda dapat membayar langsung di kasir dengan menyebutkan Nama Pemesan atau ID Pesanan Anda.",
+    cashierInstruction: "Harap bayar di kasir terlebih dahulu agar pesanan dapat diproses.",
+    pendingPayment: "Menunggu Pembayaran",
+    orderSuccessDescCashier: "Terima kasih! Pesanan Anda telah tersimpan. Silakan lakukan pembayaran di kasir agar pesanan dapat segera dibuat.",
+
     
     submitOrder: "Kirim Pesanan Sekarang",
     submitting: "Sedang Mengirim...",
@@ -230,6 +236,12 @@ export const translations = {
     fileTooLarge: "File size exceeds the limit of {size}MB!",
     fileInvalidType: "Unsupported file type! Only JPG, JPEG, PNG, and PDF are allowed.",
     proofRequired: "Payment proof is required to submit the order.",
+    payAtCashier: "Pay at Cashier",
+    cashierDesc: "Please proceed with your order. Once submitted, you can pay directly at the cashier by presenting your Customer Name or Order ID.",
+    cashierInstruction: "Please pay at the cashier first so we can start preparing your order.",
+    pendingPayment: "Pending Payment",
+    orderSuccessDescCashier: "Thank you! Your order has been saved. Please make your payment at the cashier so your order can be prepared shortly.",
+
     
     submitOrder: "Submit Order Now",
     submitting: "Submitting...",
