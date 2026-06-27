@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, ChevronDown, Clock } from 'lucide-react';
-import { format, subDays, startOfMonth } from 'date-fns';
+import { format, subDays, startOfMonth, startOfWeek } from 'date-fns';
 import { useTranslation } from '@/stores/languageStore';
 
-export type DatePreset = 'today' | 'yesterday' | 'last7Days' | 'last30Days' | 'thisMonth' | 'allTime' | 'customRange';
+export type DatePreset = 'today' | 'yesterday' | 'thisWeek' | 'last7Days' | 'last3Weeks' | 'last30Days' | 'last90Days' | 'thisMonth' | 'allTime' | 'customRange';
 
 interface DateRangeFilterProps {
   startDate: string; // yyyy-MM-dd
@@ -29,8 +29,11 @@ export function DateRangeFilter({
   const presets: { key: DatePreset; labelKey: any }[] = [
     { key: 'today', labelKey: 'today' },
     { key: 'yesterday', labelKey: 'yesterday' },
+    { key: 'thisWeek', labelKey: 'thisWeek' },
     { key: 'last7Days', labelKey: 'last7Days' },
+    { key: 'last3Weeks', labelKey: 'last3Weeks' },
     { key: 'last30Days', labelKey: 'last30Days' },
+    { key: 'last90Days', labelKey: 'last90Days' },
     { key: 'thisMonth', labelKey: 'thisMonth' },
     ...(showAllTime ? [{ key: 'allTime' as DatePreset, labelKey: 'allTime' }] : []),
     { key: 'customRange', labelKey: 'customRange' }
@@ -64,12 +67,24 @@ export function DateRangeFilter({
         startStr = format(yesterday, 'yyyy-MM-dd');
         endStr = format(yesterday, 'yyyy-MM-dd');
         break;
+      case 'thisWeek':
+        startStr = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        endStr = todayStr;
+        break;
       case 'last7Days':
         startStr = format(subDays(today, 6), 'yyyy-MM-dd');
         endStr = todayStr;
         break;
+      case 'last3Weeks':
+        startStr = format(subDays(today, 20), 'yyyy-MM-dd');
+        endStr = todayStr;
+        break;
       case 'last30Days':
         startStr = format(subDays(today, 29), 'yyyy-MM-dd');
+        endStr = todayStr;
+        break;
+      case 'last90Days':
+        startStr = format(subDays(today, 89), 'yyyy-MM-dd');
         endStr = todayStr;
         break;
       case 'thisMonth':

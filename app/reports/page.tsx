@@ -11,6 +11,7 @@ import {
   Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import toast from 'react-hot-toast';
+import { exportSalesReportExcel } from '@/lib/excelExport';
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -18,18 +19,19 @@ export default function ReportsPage() {
   const [preset, setPreset] = useState<DatePreset>('today');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [soldItems, setSoldItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Filter logic
-  const startTs = startOfDay(new Date(startDate)).getTime();
-  const endTs = endOfDay(new Date(endDate)).getTime();
+  // Filter logic with all-time guards
+  const startTs = startDate ? startOfDay(new Date(startDate)).getTime() : 0;
+  const endTs = endDate ? endOfDay(new Date(endDate)).getTime() : Date.now() * 2;
 
   useEffect(() => {
     const fetchReportData = async () => {
       setIsLoading(true);
       try {
-        const [transactionsRes, customerOrdersRes] = await Promise.all([
+        const [transactionsRes, customerOrdersRes, productsRes] = await Promise.all([
           supabase
             .from('transactions')
             .select('*')
@@ -41,14 +43,73 @@ export default function ReportsPage() {
             .select('*')
             .gte('created_at', startTs)
             .lte('created_at', endTs)
-            .eq('status', 'finished')
+            .eq('status', 'finished'),
+          supabase
+            .from('products')
+            .select('id, name')
         ]);
 
         if (transactionsRes.error) throw transactionsRes.error;
         if (customerOrdersRes.error) throw customerOrdersRes.error;
 
-        setTransactions(transactionsRes.data || []);
-        setCustomerOrders(customerOrdersRes.data || []);
+        const txs = transactionsRes.data || [];
+        const cos = customerOrdersRes.data || [];
+        const productsList = productsRes.data || [];
+
+        setTransactions(txs);
+        setCustomerOrders(cos);
+
+        const productMap: Record<string, string> = {};
+        productsList.forEach(p => {
+          productMap[p.id] = p.name;
+        });
+
+        const txIds = txs.map(tx => tx.id);
+        const orderIds = cos.map(co => co.id);
+
+        let fetchedTxItems: any[] = [];
+        let fetchedOrderItems: any[] = [];
+
+        if (txIds.length > 0) {
+          const { data, error } = await supabase
+            .from('transaction_items')
+            .select('*')
+            .in('transactionId', txIds);
+          if (!error && data) fetchedTxItems = data;
+        }
+
+        if (orderIds.length > 0) {
+          const { data, error } = await supabase
+            .from('customer_order_items')
+            .select('*')
+            .in('order_id', orderIds);
+          if (!error && data) fetchedOrderItems = data;
+        }
+
+        const combinedItemsList = [
+          ...fetchedTxItems.map(item => ({
+            transactionId: item.transactionId,
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            qty: Number(item.qty),
+            discount: Number(item.discount || 0),
+            subtotal: Number(item.subtotal),
+            date: txs.find(tx => tx.id === item.transactionId)?.date || Date.now()
+          })),
+          ...fetchedOrderItems.map(item => ({
+            transactionId: item.order_id,
+            productId: item.product_id,
+            productName: productMap[item.product_id] || 'Produk Tidak Dikenal',
+            price: item.price,
+            qty: Number(item.quantity),
+            discount: 0,
+            subtotal: item.subtotal,
+            date: cos.find(co => co.id === item.order_id)?.created_at || Date.now()
+          }))
+        ];
+
+        setSoldItems(combinedItemsList);
       } catch (err) {
         console.error('Error fetching reports data:', err);
       } finally {
@@ -88,6 +149,21 @@ export default function ReportsPage() {
   const totalDiscount = combinedItems.reduce((sum, item) => sum + item.discount, 0);
   const totalSubtotal = combinedItems.reduce((sum, item) => sum + item.subtotal, 0);
   const transactionCount = combinedItems.length;
+
+  // Top Selling Products Calculation
+  const productSalesMap: Record<string, { name: string; qty: number; totalSales: number }> = {};
+  soldItems.forEach(item => {
+    const key = item.productId;
+    if (!productSalesMap[key]) {
+      productSalesMap[key] = { name: item.productName, qty: 0, totalSales: 0 };
+    }
+    productSalesMap[key].qty += item.qty;
+    productSalesMap[key].totalSales += item.subtotal;
+  });
+
+  const topProducts = Object.values(productSalesMap)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5);
 
   // Chart Data Calculations (Daily breakdown, up to 31 points)
   const chartData = [];
@@ -145,391 +221,12 @@ export default function ReportsPage() {
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      const ExcelJS = await import('exceljs');
-      const workbook = new ExcelJS.Workbook();
-
-      // Setup workbook properties
-      workbook.creator = 'RestoFlow POS';
-      workbook.lastModifiedBy = 'RestoFlow POS';
-      workbook.created = new Date();
-      workbook.modified = new Date();
-
-      // --- SHEET 1: RINGKASAN ---
-      const summarySheet = workbook.addWorksheet('Ringkasan');
-      summarySheet.views = [{ showGridLines: true }];
-
-      // Page Title
-      summarySheet.mergeCells('A1:G1');
-      const titleCell = summarySheet.getCell('A1');
-      titleCell.value = 'RestoFlow - Laporan Ringkasan Penjualan';
-      titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-      titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
-      titleCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1E293B' } // Slate-800
-      };
-      summarySheet.getRow(1).height = 40;
-
-      // Date Range Info
-      summarySheet.mergeCells('A2:G2');
-      const rangeCell = summarySheet.getCell('A2');
-      rangeCell.value = `Periode Laporan: ${startDate} s/d ${endDate}`;
-      rangeCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
-      rangeCell.alignment = { vertical: 'middle', horizontal: 'left' };
-      summarySheet.getRow(2).height = 20;
-
-      // Card / KPI Blocks
-      // Card 1
-      summarySheet.mergeCells('A4:B4');
-      summarySheet.getCell('A4').value = 'Total Penjualan Kotor';
-      summarySheet.getCell('A4').font = { size: 9, bold: true, color: { argb: 'FF475569' } };
-      summarySheet.mergeCells('A5:B5');
-      summarySheet.getCell('A5').value = totalSubtotal;
-      summarySheet.getCell('A5').numFmt = '"Rp"#,##0';
-      summarySheet.getCell('A5').font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } }; // Blue-900
-
-      // Card 2
-      summarySheet.mergeCells('C4:D4');
-      summarySheet.getCell('C4').value = 'Total Diskon';
-      summarySheet.getCell('C4').font = { size: 9, bold: true, color: { argb: 'FF475569' } };
-      summarySheet.mergeCells('C5:D5');
-      summarySheet.getCell('C5').value = totalDiscount;
-      summarySheet.getCell('C5').numFmt = '"Rp"#,##0';
-      summarySheet.getCell('C5').font = { size: 14, bold: true, color: { argb: 'FF9F1239' } }; // Rose-800
-
-      // Card 3
-      summarySheet.mergeCells('E4:G4');
-      summarySheet.getCell('E4').value = 'Total Pendapatan Bersih';
-      summarySheet.getCell('E4').font = { size: 9, bold: true, color: { argb: 'FF475569' } };
-      summarySheet.mergeCells('E5:G5');
-      summarySheet.getCell('E5').value = totalRevenue;
-      summarySheet.getCell('E5').numFmt = '"Rp"#,##0';
-      summarySheet.getCell('E5').font = { size: 14, bold: true, color: { argb: 'FF065F46' } }; // Emerald-800
-
-      const kpiCells = ['A4', 'A5', 'B4', 'B5', 'C4', 'C5', 'D4', 'D5', 'E4', 'E5', 'F4', 'F5', 'G4', 'G5'];
-      kpiCells.forEach(cellRef => {
-        const cell = summarySheet.getCell(cellRef);
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-        };
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFF8FAFC' } // Slate-50
-        };
+      await exportSalesReportExcel(combinedItems, startDate, endDate, soldItems, {
+        totalSubtotal,
+        totalDiscount,
+        totalRevenue,
+        transactionCount
       });
-      summarySheet.getRow(4).height = 18;
-      summarySheet.getRow(5).height = 25;
-
-      // KPI Row 2
-      summarySheet.mergeCells('A7:B7');
-      summarySheet.getCell('A7').value = 'Jumlah Transaksi';
-      summarySheet.getCell('A7').font = { size: 9, bold: true, color: { argb: 'FF475569' } };
-      summarySheet.mergeCells('A8:B8');
-      summarySheet.getCell('A8').value = transactionCount;
-      summarySheet.getCell('A8').numFmt = '#,##0';
-      summarySheet.getCell('A8').font = { size: 12, bold: true, color: { argb: 'FF1E293B' } };
-
-      summarySheet.mergeCells('C7:D7');
-      summarySheet.getCell('C7').value = 'Rata-rata Transaksi';
-      summarySheet.getCell('C7').font = { size: 9, bold: true, color: { argb: 'FF475569' } };
-      summarySheet.mergeCells('C8:D8');
-      summarySheet.getCell('C8').value = transactionCount > 0 ? totalRevenue / transactionCount : 0;
-      summarySheet.getCell('C8').numFmt = '"Rp"#,##0';
-      summarySheet.getCell('C8').font = { size: 12, bold: true, color: { argb: 'FF1E293B' } };
-
-      const kpiRow2 = ['A7', 'A8', 'B7', 'B8', 'C7', 'C8', 'D7', 'D8'];
-      kpiRow2.forEach(cellRef => {
-        const cell = summarySheet.getCell(cellRef);
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-        };
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFF8FAFC' }
-        };
-      });
-      summarySheet.getRow(7).height = 18;
-      summarySheet.getRow(8).height = 25;
-
-      // Payment Summary Table
-      summarySheet.mergeCells('A11:C11');
-      const pmHeaderCell = summarySheet.getCell('A11');
-      pmHeaderCell.value = 'RINGKASAN METODE PEMBAYARAN';
-      pmHeaderCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1E293B' } };
-
-      summarySheet.getCell('A12').value = 'Metode Pembayaran';
-      summarySheet.getCell('B12').value = 'Jumlah Transaksi';
-      summarySheet.getCell('C12').value = 'Total Pendapatan';
-
-      const pmHeaders = ['A12', 'B12', 'C12'];
-      pmHeaders.forEach(cellRef => {
-        const cell = summarySheet.getCell(cellRef);
-        cell.font = { size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          bottom: { style: 'medium', color: { argb: 'FF475569' } },
-          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-        };
-      });
-      summarySheet.getRow(12).height = 20;
-
-      const pmBreakdown: Record<string, { count: number; total: number }> = {
-        'QRIS': { count: 0, total: 0 },
-        'Transfer Bank': { count: 0, total: 0 },
-        'Bayar Kasir': { count: 0, total: 0 },
-        'Lainnya/Tunai': { count: 0, total: 0 }
-      };
-
-      combinedItems.forEach(item => {
-        let method = item.paymentMethod || 'Lainnya/Tunai';
-        if (method.toUpperCase().includes('QRIS')) method = 'QRIS';
-        else if (method.toUpperCase().includes('TRANSFER') || method.toUpperCase().includes('BANK')) method = 'Transfer Bank';
-        else if (method.toUpperCase().includes('KASIR') || method.toUpperCase().includes('CASHIER')) method = 'Bayar Kasir';
-        else method = 'Lainnya/Tunai';
-
-        pmBreakdown[method].count += 1;
-        pmBreakdown[method].total += item.total;
-      });
-
-      let currentPmRow = 13;
-      Object.entries(pmBreakdown).forEach(([method, data]) => {
-        summarySheet.getCell(`A${currentPmRow}`).value = method;
-        summarySheet.getCell(`B${currentPmRow}`).value = data.count;
-        summarySheet.getCell(`C${currentPmRow}`).value = data.total;
-
-        summarySheet.getCell(`A${currentPmRow}`).alignment = { horizontal: 'left' };
-        summarySheet.getCell(`B${currentPmRow}`).alignment = { horizontal: 'center' };
-        summarySheet.getCell(`C${currentPmRow}`).alignment = { horizontal: 'right' };
-        summarySheet.getCell(`C${currentPmRow}`).numFmt = '"Rp"#,##0';
-
-        ['A', 'B', 'C'].forEach(col => {
-          const cell = summarySheet.getCell(`${col}${currentPmRow}`);
-          cell.font = { size: 9 };
-          cell.border = {
-            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-          };
-        });
-        currentPmRow++;
-      });
-
-      summarySheet.getCell(`A${currentPmRow}`).value = 'Total';
-      summarySheet.getCell(`B${currentPmRow}`).value = { formula: `=SUM(B13:B${currentPmRow - 1})` };
-      summarySheet.getCell(`C${currentPmRow}`).value = { formula: `=SUM(C13:C${currentPmRow - 1})` };
-      summarySheet.getCell(`C${currentPmRow}`).numFmt = '"Rp"#,##0';
-
-      ['A', 'B', 'C'].forEach(col => {
-        const cell = summarySheet.getCell(`${col}${currentPmRow}`);
-        cell.font = { size: 9, bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-        cell.border = {
-          top: { style: 'double', color: { argb: 'FF475569' } },
-          bottom: { style: 'double', color: { argb: 'FF475569' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-        };
-      });
-
-      // Transaction Source Summary Table
-      summarySheet.mergeCells('E11:G11');
-      const srcHeaderCell = summarySheet.getCell('E11');
-      srcHeaderCell.value = 'RINGKASAN SUMBER TRANSAKSI';
-      srcHeaderCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1E293B' } };
-
-      summarySheet.getCell('E12').value = 'Sumber Pesanan';
-      summarySheet.getCell('F12').value = 'Jumlah Transaksi';
-      summarySheet.getCell('G12').value = 'Total Pendapatan';
-
-      const srcHeaders = ['E12', 'F12', 'G12'];
-      srcHeaders.forEach(cellRef => {
-        const cell = summarySheet.getCell(cellRef);
-        cell.font = { size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          bottom: { style: 'medium', color: { argb: 'FF475569' } },
-          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-        };
-      });
-
-      const srcBreakdown: Record<string, { count: number; total: number }> = {
-        'POS Kasir': { count: 0, total: 0 },
-        'Pesanan Meja/Self-Order': { count: 0, total: 0 }
-      };
-
-      combinedItems.forEach(item => {
-        const isMeja = item.type.includes('Meja') || item.type.includes('Self-Order');
-        const key = isMeja ? 'Pesanan Meja/Self-Order' : 'POS Kasir';
-        srcBreakdown[key].count += 1;
-        srcBreakdown[key].total += item.total;
-      });
-
-      let currentSrcRow = 13;
-      Object.entries(srcBreakdown).forEach(([src, data]) => {
-        summarySheet.getCell(`E${currentSrcRow}`).value = src;
-        summarySheet.getCell(`F${currentSrcRow}`).value = data.count;
-        summarySheet.getCell(`G${currentSrcRow}`).value = data.total;
-
-        summarySheet.getCell(`E${currentSrcRow}`).alignment = { horizontal: 'left' };
-        summarySheet.getCell(`F${currentSrcRow}`).alignment = { horizontal: 'center' };
-        summarySheet.getCell(`G${currentSrcRow}`).alignment = { horizontal: 'right' };
-        summarySheet.getCell(`G${currentSrcRow}`).numFmt = '"Rp"#,##0';
-
-        ['E', 'F', 'G'].forEach(col => {
-          const cell = summarySheet.getCell(`${col}${currentSrcRow}`);
-          cell.font = { size: 9 };
-          cell.border = {
-            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-          };
-        });
-        currentSrcRow++;
-      });
-
-      summarySheet.getCell(`E${currentSrcRow}`).value = 'Total';
-      summarySheet.getCell(`F${currentSrcRow}`).value = { formula: `=SUM(F13:F${currentSrcRow - 1})` };
-      summarySheet.getCell(`G${currentSrcRow}`).value = { formula: `=SUM(G13:G${currentSrcRow - 1})` };
-      summarySheet.getCell(`G${currentSrcRow}`).numFmt = '"Rp"#,##0';
-
-      ['E', 'F', 'G'].forEach(col => {
-        const cell = summarySheet.getCell(`${col}${currentSrcRow}`);
-        cell.font = { size: 9, bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-        cell.border = {
-          top: { style: 'double', color: { argb: 'FF475569' } },
-          bottom: { style: 'double', color: { argb: 'FF475569' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-        };
-      });
-
-      summarySheet.getColumn('A').width = 22;
-      summarySheet.getColumn('B').width = 18;
-      summarySheet.getColumn('C').width = 20;
-      summarySheet.getColumn('D').width = 5;
-      summarySheet.getColumn('E').width = 24;
-      summarySheet.getColumn('F').width = 18;
-      summarySheet.getColumn('G').width = 22;
-
-      // --- SHEET 2: DETAIL TRANSAKSI ---
-      const detailSheet = workbook.addWorksheet('Detail Transaksi');
-      detailSheet.views = [{ showGridLines: true }];
-
-      const headers = ['No. Transaksi', 'Tanggal', 'Tipe / Sumber', 'Subtotal', 'Diskon', 'Total', 'Metode Bayar'];
-      const headerRow = detailSheet.addRow(headers);
-      headerRow.height = 24;
-
-      headerRow.eachCell((cell) => {
-        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF1E293B' }
-        };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FF0F172A' } },
-          bottom: { style: 'medium', color: { argb: 'FF0F172A' } },
-          left: { style: 'thin', color: { argb: 'FF334155' } },
-          right: { style: 'thin', color: { argb: 'FF334155' } }
-        };
-      });
-
-      combinedItems.forEach((item, idx) => {
-        const formattedDate = format(item.date, 'yyyy-MM-dd HH:mm:ss');
-        const row = detailSheet.addRow([
-          item.no.toUpperCase(),
-          formattedDate,
-          item.type,
-          item.subtotal,
-          item.discount,
-          item.total,
-          item.paymentMethod
-        ]);
-        row.height = 20;
-
-        row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-        row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
-        row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
-
-        row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
-        row.getCell(4).numFmt = '"Rp"#,##0';
-
-        row.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
-        row.getCell(5).numFmt = '"Rp"#,##0';
-
-        row.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
-        row.getCell(6).numFmt = '"Rp"#,##0';
-        row.getCell(6).font = { bold: true, color: { argb: 'FF047857' } };
-
-        row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
-
-        const isEven = idx % 2 === 0;
-        const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
-
-        row.eachCell((cell) => {
-          cell.font = { name: 'Arial', size: 9, ...cell.font };
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: rowBg }
-          };
-          cell.border = {
-            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-          };
-        });
-      });
-
-      detailSheet.columns.forEach((column) => {
-        let maxLen = 0;
-        column.eachCell && column.eachCell({ includeEmpty: true }, (cell) => {
-          let valueStr = '';
-          if (cell.value !== null && cell.value !== undefined) {
-            if (typeof cell.value === 'object' && 'formula' in cell.value) {
-              valueStr = 'Rp 9,999,999';
-            } else if (cell.numFmt && cell.numFmt.includes('"Rp"')) {
-              valueStr = `Rp ${Number(cell.value).toLocaleString('id-ID')}`;
-            } else {
-              valueStr = String(cell.value);
-            }
-          }
-          maxLen = Math.max(maxLen, valueStr.length);
-        });
-        column.width = Math.max(maxLen + 4, 12);
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `laporan_penjualan_${startDate}_to_${endDate}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Laporan Excel (.xlsx) berhasil diunduh!');
     } catch (err) {
       console.error('Gagal mengekspor ke Excel:', err);
       toast.error('Gagal mengekspor ke Excel');
@@ -691,6 +388,79 @@ export default function ReportsPage() {
                 </PieChart>
               </ResponsiveContainer>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Top Products & Order Source Insights Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top 5 Products Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 lg:col-span-2">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">Top 5 Produk Terlaris</h2>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Produk dengan kuantitas penjualan tertinggi</p>
+          </div>
+          {isLoading ? (
+            <div className="py-8 text-center text-slate-400 text-xs font-semibold">Memuat data produk...</div>
+          ) : topProducts.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs font-semibold">Belum ada data produk terjual.</div>
+          ) : (
+            <div className="space-y-4">
+              {topProducts.map((p, idx) => {
+                const maxQty = topProducts[0]?.qty || 1;
+                const percentage = (p.qty / maxQty) * 100;
+                return (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-700">{idx + 1}. {p.name}</span>
+                      <span className="text-slate-500">{p.qty}x terjual <span className="text-slate-350 font-normal">|</span> Rp {p.totalSales.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-emerald-550 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Sales Channel & Statistics Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">Statistik Penjualan</h2>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Rangkuman performa operasional</p>
+          </div>
+          <div className="space-y-4 divide-y divide-slate-100 text-xs font-bold text-slate-650">
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-slate-500">Rata-rata Per Transaksi</span>
+              <span className="text-slate-800 font-extrabold text-sm">
+                Rp {transactionCount > 0 ? Math.round(totalRevenue / transactionCount).toLocaleString('id-ID') : '0'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-slate-500">Omzet POS Kasir</span>
+              <span className="text-slate-800">
+                Rp {combinedItems.filter(item => item.type === 'POS Kasir').reduce((sum, i) => sum + i.total, 0).toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-slate-500">Omzet Self-Order / Meja</span>
+              <span className="text-slate-800">
+                Rp {combinedItems.filter(item => item.type !== 'POS Kasir').reduce((sum, i) => sum + i.total, 0).toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-slate-500">Rasio Self-Order / Meja</span>
+              <span className="text-blue-600 font-extrabold">
+                {transactionCount > 0 
+                  ? `${Math.round((combinedItems.filter(item => item.type !== 'POS Kasir').length / transactionCount) * 100)}%`
+                  : '0%'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
