@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Transaction, TransactionItem } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { Search, Eye, FileText, X } from 'lucide-react';
 import { Receipt } from '@/components/pos/Receipt';
+import { DateRangeFilter, DatePreset } from '@/components/ui/DateRangeFilter';
 
 export default function HistoryPage() {
+  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [preset, setPreset] = useState<DatePreset>('last30Days');
   const [activeTab, setActiveTab] = useState<'pos' | 'meja'>('pos');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
@@ -20,19 +24,20 @@ export default function HistoryPage() {
   const fetchHistoryData = async () => {
     setIsLoading(true);
     try {
+      let txQuery = supabase.from('transactions').select('*');
+      let coQuery = supabase.from('customer_orders').select('*').eq('status', 'finished');
+      
+      if (startDate && endDate) {
+        const startTs = startOfDay(new Date(startDate)).getTime();
+        const endTs = endOfDay(new Date(endDate)).getTime();
+        txQuery = txQuery.gte('date', startTs).lte('date', endTs);
+        coQuery = coQuery.gte('created_at', startTs).lte('created_at', endTs);
+      }
+
       const [transactionsRes, customerOrdersRes, tablesRes] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('*')
-          .order('date', { ascending: false }),
-        supabase
-          .from('customer_orders')
-          .select('*')
-          .eq('status', 'finished')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('tables')
-          .select('*')
+        txQuery.order('date', { ascending: false }),
+        coQuery.order('created_at', { ascending: false }),
+        supabase.from('tables').select('*')
       ]);
 
       if (transactionsRes.error) throw transactionsRes.error;
@@ -50,7 +55,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetchHistoryData();
-  }, []);
+  }, [startDate, endDate]);
 
   const filteredTransactions = transactions.filter(tx => 
     tx.no.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -153,6 +158,21 @@ export default function HistoryPage() {
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>
+      </div>
+
+      {/* Date Filter Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xs font-black text-slate-855 tracking-tight uppercase">Filter Rentang Tanggal</h3>
+          <p className="text-[11px] text-slate-400 font-bold mt-0.5">Saring riwayat transaksi yang ditampilkan dalam tabel.</p>
+        </div>
+        <DateRangeFilter 
+          startDate={startDate} 
+          endDate={endDate} 
+          selectedPreset={preset} 
+          onChange={(start, end, pr) => { setStartDate(start); setEndDate(end); setPreset(pr); }}
+          showAllTime={true}
+        />
       </div>
 
       {/* Tabs Submenu */}

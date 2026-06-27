@@ -7,15 +7,20 @@ import {
 import { useState, useEffect } from 'react';
 import { Transaction, Product, TransactionItem, Category } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import { startOfDay, format, subDays } from 'date-fns';
+import { startOfDay, format, subDays, endOfDay } from 'date-fns';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
   Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend 
 } from 'recharts';
 import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/stores/languageStore';
+import { DateRangeFilter, DatePreset } from '@/components/ui/DateRangeFilter';
 import Link from 'next/link';
 
 export default function Dashboard() {
+  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [preset, setPreset] = useState<DatePreset>('last30Days');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<TransactionItem[]>([]);
@@ -26,7 +31,9 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState('');
   const { user } = useAuthStore();
+  const { t, language } = useTranslation();
 
+  // Clock Effect
   useEffect(() => {
     setCurrentTime(new Date().toLocaleDateString('id-ID', { 
       weekday: 'long', 
@@ -36,10 +43,16 @@ export default function Dashboard() {
       hour: '2-digit', 
       minute: '2-digit' 
     }));
+  }, []);
 
+  // Fetch Dashboard Data Effect
+  useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
+        const startTs = startOfDay(new Date(startDate)).getTime();
+        const endTs = endOfDay(new Date(endDate)).getTime();
+
         const [
           productsRes, 
           transactionsRes, 
@@ -50,9 +63,9 @@ export default function Dashboard() {
           categoriesRes
         ] = await Promise.all([
           supabase.from('products').select('*').eq('deleted', false),
-          supabase.from('transactions').select('*').gte('date', subDays(startOfDay(new Date()), 30).getTime()),
+          supabase.from('transactions').select('*').gte('date', startTs).lte('date', endTs),
           supabase.from('transaction_items').select('*').limit(1000),
-          supabase.from('customer_orders').select('*').eq('status', 'finished').gte('created_at', subDays(startOfDay(new Date()), 30).getTime()),
+          supabase.from('customer_orders').select('*').eq('status', 'finished').gte('created_at', startTs).lte('created_at', endTs),
           supabase.from('customer_order_items').select('*').limit(1000),
           supabase.from('customer_orders').select('*').in('status', ['pending_confirmation', 'preparing', 'delivery']).order('created_at', { ascending: false }).limit(5),
           supabase.from('categories').select('*').eq('deleted', false)
@@ -73,32 +86,59 @@ export default function Dashboard() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [startDate, endDate]);
 
-  const today = startOfDay(new Date()).getTime();
+  // Labels helper for period metrics
+  const getRevenueLabel = () => {
+    if (language === 'en') {
+      return preset === 'today' ? "Today's Revenue" : preset === 'yesterday' ? "Yesterday's Revenue" : "Revenue in Period";
+    }
+    return preset === 'today' ? "Pendapatan Hari Ini" : preset === 'yesterday' ? "Pendapatan Kemarin" : "Pendapatan Periode Ini";
+  };
 
-  // Metrics
-  const todayRevenue = 
+  const getSalesLabel = () => {
+    if (language === 'en') {
+      return preset === 'today' ? "Today's Sales" : preset === 'yesterday' ? "Yesterday's Sales" : "Sales in Period";
+    }
+    return preset === 'today' ? "Penjualan Hari Ini" : preset === 'yesterday' ? "Penjualan Kemarin" : "Penjualan Periode Ini";
+  };
+
+  const getBestProductLabel = () => {
+    if (language === 'en') {
+      return preset === 'today' ? "Today's Best Seller" : preset === 'yesterday' ? "Yesterday's Best Seller" : "Best Seller in Period";
+    }
+    return preset === 'today' ? "Produk Terlaris" : preset === 'yesterday' ? "Produk Terlaris Kemarin" : "Produk Terlaris Periode Ini";
+  };
+
+  // Metrics (filtered in query now, so we just aggregate)
+  const periodRevenue = 
     transactions
-      .filter(tx => tx.date >= today && tx.status === 'completed')
+      .filter(tx => tx.status === 'completed')
       .reduce((sum, tx) => sum + tx.total, 0) +
     customerOrders
-      .filter(co => co.created_at >= today && co.status === 'finished')
+      .filter(co => co.status === 'finished')
       .reduce((sum, co) => sum + co.total_amount, 0);
 
-  const todaySalesCount = 
-    transactions.filter(tx => tx.date >= today && tx.status === 'completed').length +
-    customerOrders.filter(co => co.created_at >= today && co.status === 'finished').length;
+  const periodSalesCount = 
+    transactions.filter(tx => tx.status === 'completed').length +
+    customerOrders.filter(co => co.status === 'finished').length;
 
   const lowStockProducts = products.filter(p => !p.deleted && p.stock <= 5).length;
 
+  // Active Transaction & Order IDs for accurate items filtering
+  const activeTxIds = new Set(transactions.filter(t => t.status === 'completed').map(t => t.id));
+  const activeOrderIds = new Set(customerOrders.filter(co => co.status === 'finished').map(co => co.id));
+
   let bestSellingProduct = '-';
-  if (items.length > 0 || customerOrderItems.length > 0) {
+  const matchingItems = items.filter(item => activeTxIds.has(item.transactionId));
+  const matchingOrderItems = customerOrderItems.filter(item => activeOrderIds.has(item.order_id));
+
+  if (matchingItems.length > 0 || matchingOrderItems.length > 0) {
     const productSales: Record<string, number> = {};
-    items.forEach(item => {
+    matchingItems.forEach(item => {
       productSales[item.productName] = (productSales[item.productName] || 0) + item.qty;
     });
-    customerOrderItems.forEach(item => {
+    matchingOrderItems.forEach(item => {
       const prodName = products.find(p => p.id === item.product_id)?.name || 'Unknown Product';
       productSales[prodName] = (productSales[prodName] || 0) + item.quantity;
     });
@@ -112,25 +152,56 @@ export default function Dashboard() {
     }
   }
 
-  // Chart Data (Last 7 Days)
+  // Chart Data Calculations (Dynamic based on selected period range)
   const chartData = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = subDays(new Date(), i);
-    const start = startOfDay(date).getTime();
-    const end = start + 86400000;
-    
-    const dayRevenue = 
-      transactions
-        .filter(tx => tx.date >= start && tx.date < end && tx.status === 'completed')
-        .reduce((sum, tx) => sum + tx.total, 0) +
-      customerOrders
-        .filter(co => co.created_at >= start && co.created_at < end && co.status === 'finished')
-        .reduce((sum, co) => sum + co.total_amount, 0);
+  const startD = new Date(startDate);
+  const endD = new Date(endDate);
+  const diffTime = Math.abs(endD.getTime() - startD.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Number of days (e.g. 1, 7, 30)
+
+  if (diffDays <= 1) {
+    // Single-day breakdown: show 2-hourly sales flow
+    for (let hour = 8; hour <= 22; hour += 2) {
+      const intervalStart = new Date(startDate);
+      intervalStart.setHours(hour, 0, 0, 0);
+      const intervalEnd = new Date(startDate);
+      intervalEnd.setHours(hour + 2, 0, 0, 0);
       
-    chartData.push({
-      name: format(date, 'dd MMM'),
-      revenue: dayRevenue
-    });
+      const intervalRevenue = 
+        transactions
+          .filter(tx => tx.date >= intervalStart.getTime() && tx.date < intervalEnd.getTime() && tx.status === 'completed')
+          .reduce((sum, tx) => sum + tx.total, 0) +
+        customerOrders
+          .filter(co => co.created_at >= intervalStart.getTime() && co.created_at < intervalEnd.getTime() && co.status === 'finished')
+          .reduce((sum, co) => sum + co.total_amount, 0);
+          
+      chartData.push({
+        name: `${String(hour).padStart(2, '0')}:00`,
+        revenue: intervalRevenue
+      });
+    }
+  } else {
+    // Multi-day breakdown: show daily points (max 31 days to avoid crowding)
+    const daysToRender = Math.min(diffDays, 31);
+    const startTs = startOfDay(startD).getTime();
+    for (let i = 0; i < daysToRender; i++) {
+      const date = new Date(startTs + i * 24 * 60 * 60 * 1000);
+      const start = startOfDay(date).getTime();
+      const end = endOfDay(date).getTime();
+      
+      const dayRevenue = 
+        transactions
+          .filter(tx => tx.date >= start && tx.date <= end && tx.status === 'completed')
+          .reduce((sum, tx) => sum + tx.total, 0) +
+        customerOrders
+          .filter(co => co.created_at >= start && co.created_at <= end && co.status === 'finished')
+          .reduce((sum, co) => sum + co.total_amount, 0);
+        
+      chartData.push({
+        name: format(date, 'dd MMM'),
+        revenue: dayRevenue
+      });
+    }
   }
 
   // Donut Chart data: POS vs Meja
@@ -149,7 +220,7 @@ export default function Dashboard() {
   // Top Selling Products Calculations
   const productAgg: Record<string, { name: string; category: string; qty: number; revenue: number }> = {};
   
-  items.forEach(item => {
+  matchingItems.forEach(item => {
     const prod = products.find(p => p.name === item.productName || p.id === item.productId);
     const catName = categories.find(c => c.id === prod?.categoryId)?.name || 'Makanan';
     
@@ -160,7 +231,7 @@ export default function Dashboard() {
     productAgg[item.productId].revenue += item.subtotal;
   });
 
-  customerOrderItems.forEach(item => {
+  matchingOrderItems.forEach(item => {
     const prod = products.find(p => p.id === item.product_id);
     if (!prod) return;
     const catName = categories.find(c => c.id === prod.categoryId)?.name || 'Makanan';
@@ -210,7 +281,7 @@ export default function Dashboard() {
           <div className="space-y-2">
             <h2 className="text-xl md:text-2xl font-black tracking-tight flex items-center">
               <span>Selamat Datang Kembali, </span>
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 pl-1.5">{user?.name || 'Kasir'}</span>!
+              <span className="bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-emerald-400 pl-1.5">{user?.name || 'Kasir'}</span>!
             </h2>
             <p className="text-xs md:text-sm text-slate-350 font-semibold max-w-xl leading-relaxed">
               Semua sistem berjalan normal. Pantau analisis transaksi, pesanan aktif dari meja pelanggan, dan performa menu terpopuler hari ini.
@@ -223,6 +294,21 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Date Filter Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-black text-slate-800 tracking-tight">Recap & Ringkasan Performa</h3>
+          <p className="text-[11px] text-slate-450 font-bold mt-0.5">Filter data transaksi untuk memperbarui metrik dan grafik.</p>
+        </div>
+        <DateRangeFilter 
+          startDate={startDate} 
+          endDate={endDate} 
+          selectedPreset={preset} 
+          onChange={(start, end, pr) => { setStartDate(start); setEndDate(end); setPreset(pr); }}
+          showAllTime={false}
+        />
+      </div>
       
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -232,8 +318,8 @@ export default function Dashboard() {
             <DollarSign size={22} className="stroke-2" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">Pendapatan Hari Ini</p>
-            <p className="text-xl font-black text-slate-800 mt-0.5">Rp {todayRevenue.toLocaleString('id-ID')}</p>
+            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">{getRevenueLabel()}</p>
+            <p className="text-xl font-black text-slate-800 mt-0.5">Rp {periodRevenue.toLocaleString('id-ID')}</p>
           </div>
         </div>
 
@@ -243,8 +329,8 @@ export default function Dashboard() {
             <ShoppingBag size={20} className="stroke-2" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">Penjualan Hari Ini</p>
-            <p className="text-xl font-black text-slate-800 mt-0.5">{todaySalesCount} Transaksi</p>
+            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">{getSalesLabel()}</p>
+            <p className="text-xl font-black text-slate-800 mt-0.5">{periodSalesCount} Transaksi</p>
           </div>
         </div>
 
@@ -254,7 +340,7 @@ export default function Dashboard() {
             <TrendingUp size={20} className="stroke-2" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">Produk Terlaris</p>
+            <p className="text-[10px] text-slate-450 font-black uppercase tracking-wider">{getBestProductLabel()}</p>
             <p className="text-sm font-black text-slate-800 mt-1 line-clamp-1" title={bestSellingProduct}>{bestSellingProduct}</p>
           </div>
         </div>

@@ -8,7 +8,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/stores/languageStore';
 import { 
   User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
-  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift
+  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
+  Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,7 +40,7 @@ function CustomerOrderFormContent() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer'>('qris');
+  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [paymentProof, setPaymentProof] = useState<string>('');
   const [paymentProofName, setPaymentProofName] = useState<string>('');
@@ -190,7 +191,7 @@ function CustomerOrderFormContent() {
   };
 
   const handleSubmitOrder = async () => {
-    if (!paymentProof) {
+    if (paymentMethod !== 'cashier' && !paymentProof) {
       toast.error(t('proofRequired'));
       return;
     }
@@ -206,7 +207,7 @@ function CustomerOrderFormContent() {
         customer_email: customerEmail,
         total_amount: getTotal(),
         payment_method: paymentMethod,
-        payment_proof: paymentProof,
+        payment_proof: paymentMethod === 'cashier' ? 'cashier' : paymentProof,
         status: 'pending_confirmation',
         notes: null,
         table_id: tableId === 'takeaway' || !tableId ? null : tableId,
@@ -488,8 +489,15 @@ function CustomerOrderFormContent() {
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
-                          <p className="font-bold text-sm text-slate-800">{t('pending_confirmation')}</p>
-                          <p className="text-xs text-slate-400 font-medium mt-0.5">Bukti transfer sedang divalidasi oleh kasir</p>
+                          <p className="font-bold text-sm text-slate-800">
+                            {trackedOrder.payment_method === 'cashier' ? 'Belum Bayar' : t('pending_confirmation')}
+                          </p>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">
+                            {trackedOrder.payment_method === 'cashier'
+                              ? 'Harap lakukan pembayaran di meja kasir'
+                              : 'Bukti transfer sedang divalidasi oleh kasir'
+                            }
+                          </p>
                         </div>
                       </div>
 
@@ -876,7 +884,7 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Payment Method Selector */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('qris'); setPaymentProof(''); setPaymentProofName(''); }}
@@ -887,7 +895,7 @@ function CustomerOrderFormContent() {
                     }`}
                   >
                     <QrCode size={22} />
-                    <span className="text-xs uppercase tracking-wider">QRIS</span>
+                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS</span>
                   </button>
                   <button
                     type="button"
@@ -899,7 +907,19 @@ function CustomerOrderFormContent() {
                     }`}
                   >
                     <FileText size={22} />
-                    <span className="text-xs uppercase tracking-wider">Transfer Bank</span>
+                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">Transfer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPaymentMethod('cashier'); setPaymentProof('cashier'); setPaymentProofName(''); }}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center space-y-2 cursor-pointer transition-all ${
+                      paymentMethod === 'cashier' 
+                        ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Banknote size={22} />
+                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">Ke Kasir</span>
                   </button>
                 </div>
 
@@ -907,7 +927,7 @@ function CustomerOrderFormContent() {
                 <div className="p-4 bg-slate-50/60 border border-slate-250/60 rounded-3xl flex flex-col items-center text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3">Informasi Pembayaran</p>
                   
-                  {paymentMethod === 'qris' ? (
+                  {paymentMethod === 'qris' && (
                     <div className="space-y-4 flex flex-col items-center">
                       <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
                       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
@@ -922,7 +942,9 @@ function CustomerOrderFormContent() {
                         Total: Rp {getTotal().toLocaleString('id-ID')}
                       </div>
                     </div>
-                  ) : (
+                  )}
+
+                  {paymentMethod === 'bank_transfer' && (
                     <div className="space-y-4 w-full">
                       <p className="text-xs text-slate-500 font-semibold">{t('bankTransferDesc')}</p>
                       
@@ -990,36 +1012,52 @@ function CustomerOrderFormContent() {
                       </div>
                     </div>
                   )}
+
+                  {paymentMethod === 'cashier' && (
+                    <div className="space-y-4 flex flex-col items-center py-2 animate-in fade-in duration-300">
+                      <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center border border-blue-200 shadow-inner">
+                        <Banknote size={24} className="text-blue-600 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-slate-500 font-semibold max-w-xs leading-normal">
+                        {t('cashierDesc')}
+                      </p>
+                      <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
+                        Total: Rp {getTotal().toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Upload Proof Area */}
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
-                  
-                  <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-white rounded-2xl p-6 transition-all duration-300 text-center shadow-sm">
-                    <input 
-                      type="file" 
-                      accept="image/png, image/jpeg, image/jpg, application/pdf"
-                      onChange={handleFileChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
+                {paymentMethod !== 'cashier' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
                     
-                    <div className="space-y-2 flex flex-col items-center">
-                      <Upload size={32} className="text-slate-400 animate-bounce" style={{ animationDuration: '2s' }} />
-                      {paymentProofName ? (
-                        <div className="flex items-center space-x-1.5 text-emerald-600 font-black animate-in zoom-in duration-300">
-                          <CheckCircle size={16} />
-                          <span className="text-sm truncate max-w-[240px]">{paymentProofName}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-sm font-bold text-slate-700">{t('dragDrop')}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">{t('uploadProofDesc', { size: settings.maxFileSize || 5 })}</p>
-                        </>
-                      )}
+                    <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-white rounded-2xl p-6 transition-all duration-300 text-center shadow-sm">
+                      <input 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/jpg, application/pdf"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      
+                      <div className="space-y-2 flex flex-col items-center">
+                        <Upload size={32} className="text-slate-400 animate-bounce" style={{ animationDuration: '2s' }} />
+                        {paymentProofName ? (
+                          <div className="flex items-center space-x-1.5 text-emerald-600 font-black animate-in zoom-in duration-300">
+                            <CheckCircle size={16} />
+                            <span className="text-sm truncate max-w-[240px]">{paymentProofName}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-bold text-slate-700">{t('dragDrop')}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{t('uploadProofDesc', { size: settings.maxFileSize || 5 })}</p>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Footer Controls */}
                 <div className="pt-4 border-t border-slate-100 flex justify-between space-x-3">
@@ -1033,7 +1071,7 @@ function CustomerOrderFormContent() {
                   </button>
                   <button 
                     onClick={handleSubmitOrder}
-                    disabled={loading || !paymentProof}
+                    disabled={loading || (paymentMethod !== 'cashier' && !paymentProof)}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl shadow-md shadow-emerald-500/15 flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >
                     {loading ? (
@@ -1049,6 +1087,7 @@ function CustomerOrderFormContent() {
               </div>
             )}
 
+
             {/* STEP 5: SUCCESS & LIVE TRACKING */}
             {step === 5 && submittedOrder && (
               <div className="p-6 space-y-6 text-center animate-in fade-in duration-500">
@@ -1058,7 +1097,12 @@ function CustomerOrderFormContent() {
                 
                 <div className="space-y-1.5">
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('orderSuccess')}</h2>
-                  <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto">{t('orderSuccessDesc')}</p>
+                  <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto">
+                    {submittedOrder.payment_method === 'cashier' 
+                      ? t('orderSuccessCashierDesc')
+                      : t('orderSuccessDesc')
+                    }
+                  </p>
                 </div>
 
                 {/* Display Order Code Card */}
@@ -1110,8 +1154,15 @@ function CustomerOrderFormContent() {
                           <Check size={11} className="stroke-3" />
                         </span>
                         <div>
-                          <p className="font-bold text-sm text-slate-800 leading-none">{t('pending_confirmation')}</p>
-                          <p className="text-[10px] text-slate-400 mt-1">Bukti bayar sedang dicek kasir</p>
+                          <p className="font-bold text-sm text-slate-800 leading-none">
+                            {submittedOrder.payment_method === 'cashier' ? 'Belum Bayar' : t('pending_confirmation')}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {submittedOrder.payment_method === 'cashier' 
+                              ? 'Harap lakukan pembayaran di meja kasir' 
+                              : 'Bukti bayar sedang dicek kasir'
+                            }
+                          </p>
                         </div>
                       </div>
 

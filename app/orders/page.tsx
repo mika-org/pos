@@ -7,16 +7,24 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/stores/languageStore';
 import { 
   Search, Eye, Check, X, Clipboard, ArrowRight, Download, 
-  ChevronLeft, ChevronRight, FileText, CheckCircle, Clock, Info, ShieldAlert
+  ChevronLeft, ChevronRight, FileText, CheckCircle, Clock, Info, ShieldAlert,
+  Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'next/navigation';
+import { DateRangeFilter, DatePreset } from '@/components/ui/DateRangeFilter';
+import { startOfDay, endOfDay, format, subDays } from 'date-fns';
 
 function AdminOrdersPageContent() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuthStore();
   const searchParams = useSearchParams();
   
+  // Date filter State
+  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [preset, setPreset] = useState<DatePreset>('last30Days');
+
   // Db State
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [tables, setTables] = useState<DiningTable[]>([]);
@@ -43,10 +51,18 @@ function AdminOrdersPageContent() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      let query = supabase.from('customer_orders').select('*');
+      
+      if (startDate && endDate) {
+        const startTs = startOfDay(new Date(startDate)).getTime();
+        const endTs = endOfDay(new Date(endDate)).getTime();
+        query = query.gte('created_at', startTs).lte('created_at', endTs);
+      }
+
       const [tablesRes, usersRes, ordersRes] = await Promise.all([
         supabase.from('tables').select('*'),
         supabase.from('users').select('id, name'),
-        supabase.from('customer_orders').select('*').order('created_at', { ascending: false })
+        query.order('created_at', { ascending: false })
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
@@ -64,7 +80,7 @@ function AdminOrdersPageContent() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [startDate, endDate]);
 
   // Listen to search params changes and auto-open specific orders
   useEffect(() => {
@@ -343,6 +359,21 @@ function AdminOrdersPageContent() {
         </div>
       </div>
 
+      {/* Date Filter Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xs font-black text-slate-850 tracking-tight uppercase">Filter Tanggal Pesanan</h3>
+          <p className="text-[11px] text-slate-400 font-bold mt-0.5">Saring pesanan masuk berdasarkan tanggal transfer/dibuat.</p>
+        </div>
+        <DateRangeFilter 
+          startDate={startDate} 
+          endDate={endDate} 
+          selectedPreset={preset} 
+          onChange={(start, end, pr) => { setStartDate(start); setEndDate(end); setPreset(pr); setCurrentPage(1); }}
+          showAllTime={true}
+        />
+      </div>
+
       {/* Tabs with visual count badges */}
       <div className="flex gap-2 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
         {(['all', 'pending_confirmation', 'preparing', 'delivery', 'finished', 'rejected'] as const).map(tab => {
@@ -430,7 +461,9 @@ function AdminOrdersPageContent() {
                       </span>
                     </td>
                     <td className="p-4 font-black text-slate-800 text-sm">Rp {order.total_amount.toLocaleString('id-ID')}</td>
-                    <td className="p-4 uppercase text-xs font-extrabold text-slate-500">{order.payment_method === 'qris' ? 'QRIS' : 'Transfer'}</td>
+                    <td className="p-4 uppercase text-xs font-extrabold text-slate-500">
+                      {order.payment_method === 'qris' ? 'QRIS' : order.payment_method === 'bank_transfer' ? 'Transfer' : 'Bayar Kasir'}
+                    </td>
                     <td className="p-4">{getStatusBadge(order.status)}</td>
                     <td className="p-4 text-xs text-slate-500 font-semibold">
                       {new Date(order.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
@@ -580,18 +613,32 @@ function AdminOrdersPageContent() {
               {/* Payment Proof Section */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center pl-1">
-                  <h3 className="text-xs text-slate-500 font-black uppercase tracking-wider">{t('paymentProofPreview')}</h3>
-                  <button 
-                    onClick={() => handleDownloadProof(selectedOrder)}
-                    className="text-xs text-blue-600 font-bold hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
-                  >
-                    <Download size={13} />
-                    <span>{t('downloadProof')}</span>
-                  </button>
+                  <h3 className="text-xs text-slate-500 font-black uppercase tracking-wider">
+                    {selectedOrder.payment_method === 'cashier' ? 'Metode Pembayaran' : t('paymentProofPreview')}
+                  </h3>
+                  {selectedOrder.payment_method !== 'cashier' && (
+                    <button 
+                      onClick={() => handleDownloadProof(selectedOrder)}
+                      className="text-xs text-blue-600 font-bold hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Download size={13} />
+                      <span>{t('downloadProof')}</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex justify-center items-center overflow-hidden min-h-[220px] max-h-[350px]">
-                  {selectedOrder.payment_proof.startsWith('data:application/pdf;') ? (
+                  {selectedOrder.payment_method === 'cashier' ? (
+                    <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[340px] animate-in fade-in duration-300">
+                      <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center border border-blue-200">
+                        <Banknote size={24} className="text-blue-600" />
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Bayar Langsung di Kasir</h4>
+                      <p className="text-[11px] text-slate-500 leading-normal">
+                        Pesanan ini menggunakan metode Bayar di Kasir. Silakan terima pembayaran langsung dari pelanggan di kasir sebesar total tagihan, kemudian klik tombol <strong>Terima Pembayaran Kasir</strong> untuk memproses pesanan ke dapur.
+                      </p>
+                    </div>
+                  ) : selectedOrder.payment_proof.startsWith('data:application/pdf;') ? (
                     <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[280px]">
                       <FileText className="mx-auto text-rose-500" size={48} />
                       <p className="text-xs font-bold text-slate-700">Berkas Dokumen PDF</p>
@@ -667,14 +714,14 @@ function AdminOrdersPageContent() {
                         className="flex-1 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-655 hover:text-rose-600 font-bold py-3 rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <X size={15} />
-                        <span>Tolak Bukti</span>
+                        <span>{selectedOrder.payment_method === 'cashier' ? 'Tolak Pesanan' : 'Tolak Bukti'}</span>
                       </button>
                       <button
                         onClick={() => handleApprove(selectedOrder)}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/10 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <Check size={15} />
-                        <span>Terima Bukti</span>
+                        <span>{selectedOrder.payment_method === 'cashier' ? 'Terima Pembayaran Kasir' : 'Terima Bukti'}</span>
                       </button>
                     </>
                   )}
