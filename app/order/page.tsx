@@ -4,11 +4,12 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Product, Category, DiningTable, CustomerOrder } from '@/lib/db';
+import { TranslationKey } from '@/lib/translations';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/stores/languageStore';
 import {
   User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check,
-  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
+  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass,
   Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -44,6 +45,16 @@ function CustomerOrderFormContent() {
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [paymentProof, setPaymentProof] = useState<string>('');
   const [paymentProofName, setPaymentProofName] = useState<string>('');
+  const [draftOrderId] = useState(() => `ORD-${Date.now().toString().slice(-7)}-${crypto.randomUUID().slice(0, 6)}`);
+  const [qrisPayment, setQrisPayment] = useState<{
+    loading: boolean;
+    mode?: 'xendit' | 'static';
+    qrImage?: string;
+    paymentRequestId?: string;
+    status?: string;
+    error?: string;
+  }>({ loading: false });
+  const tenantSlug = searchParams.get('tenant') || process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || '';
 
   // Submitted Order State (for success step tracking)
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
@@ -53,12 +64,16 @@ function CustomerOrderFormContent() {
   const [isTrackingMode, setIsTrackingMode] = useState(false);
   const [trackingIdInput, setTrackingIdInput] = useState('');
   const [trackedOrder, setTrackedOrder] = useState<CustomerOrder | null>(null);
-  const [trackedOrderItems, setTrackedOrderItems] = useState<any[]>([]);
+  const [trackedOrderItems, setTrackedOrderItems] = useState<Array<{
+    quantity: number;
+    price: number;
+    subtotal: number;
+    product_id: string;
+    productName: string;
+  }>>([]);
 
   // Fetch Master Data & Settings on Mount
   useEffect(() => {
-    fetchSettings();
-
     const loadMasterData = async () => {
       try {
         const [tablesRes, categoriesRes, productsRes] = await Promise.all([
@@ -75,25 +90,35 @@ function CustomerOrderFormContent() {
       }
     };
 
-    loadMasterData();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void fetchSettings();
+      void loadMasterData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchSettings]);
 
   // Lock table if query parameter is present
   useEffect(() => {
-    if (tableParam && tables.length > 0) {
-      const found = tables.find(t => t.id === tableParam);
-      if (found) {
-        setTableId(found.id);
-        setSelectedTableObj(found);
+    const timer = window.setTimeout(() => {
+      if (tableParam && tables.length > 0) {
+        const found = tables.find(t => t.id === tableParam);
+        if (found) {
+          setTableId(found.id);
+          setSelectedTableObj(found);
+        }
       }
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [tableParam, tables]);
 
   // Auto-select first bank account when settings load
   useEffect(() => {
-    if (settings.bankAccounts && settings.bankAccounts.length > 0 && !selectedBankId) {
-      setSelectedBankId(settings.bankAccounts[0].id);
-    }
+    const timer = window.setTimeout(() => {
+      if (settings.bankAccounts && settings.bankAccounts.length > 0 && !selectedBankId) {
+        setSelectedBankId(settings.bankAccounts[0].id);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [settings.bankAccounts, selectedBankId]);
 
   // Sync selected table object on manual select change
@@ -156,6 +181,46 @@ function CustomerOrderFormContent() {
   const getTotal = () => {
     return getSubtotal() + getTax();
   };
+  const qrisAmount = getTotal();
+
+  useEffect(() => {
+    if (step !== 4 || paymentMethod !== 'qris') return;
+    let cancelled = false;
+    const createPayment = async () => {
+      setQrisPayment({ loading: true });
+      const response = await fetch('/api/payments/qris', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-tenant-slug': tenantSlug },
+        body: JSON.stringify({ referenceId: draftOrderId, amount: qrisAmount }),
+      });
+      const payload = await response.json();
+      if (cancelled) return;
+      if (!response.ok) setQrisPayment({ loading: false, error: payload.error || 'QRIS tidak tersedia' });
+      else setQrisPayment({
+        loading: false,
+        mode: payload.mode,
+        qrImage: payload.qrImage,
+        paymentRequestId: payload.paymentRequestId,
+        status: payload.status,
+      });
+    };
+    void createPayment();
+    return () => { cancelled = true; };
+  }, [step, paymentMethod, draftOrderId, tenantSlug, qrisAmount]);
+
+  useEffect(() => {
+    if (qrisPayment.mode !== 'xendit' || !qrisPayment.paymentRequestId || qrisPayment.status === 'SUCCEEDED') return;
+    const interval = setInterval(async () => {
+      const response = await fetch(`/api/payments/qris/${encodeURIComponent(qrisPayment.paymentRequestId!)}?tenant=${encodeURIComponent(tenantSlug)}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (payload.status) setQrisPayment((current) => ({ ...current, status: payload.status }));
+      if (payload.paid) {
+        setPaymentProof(`xendit:${qrisPayment.paymentRequestId}`);
+        toast.success('Pembayaran Xendit berhasil diterima');
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [qrisPayment.mode, qrisPayment.paymentRequestId, qrisPayment.status, tenantSlug]);
 
   const getCartCount = () => {
     return Object.values(cart).reduce((sum, item) => sum + item.qty, 0);
@@ -191,23 +256,28 @@ function CustomerOrderFormContent() {
   };
 
   const handleSubmitOrder = async () => {
-    if (paymentMethod !== 'cashier' && !paymentProof) {
+    const usesXendit = paymentMethod === 'qris' && qrisPayment.mode === 'xendit';
+    if (usesXendit && qrisPayment.status !== 'SUCCEEDED') {
+      toast.error('Selesaikan pembayaran Xendit terlebih dahulu');
+      return;
+    }
+    if (paymentMethod !== 'cashier' && !usesXendit && !paymentProof) {
       toast.error(t('proofRequired'));
       return;
     }
 
     setLoading(true);
     try {
-      const orderId = `ORD-${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 105)}`;
+      const orderId = draftOrderId;
       const now = Date.now();
 
-      const orderPayload = {
+      const orderPayload: CustomerOrder = {
         id: orderId,
         customer_name: customerName,
         customer_email: customerEmail,
         total_amount: getTotal(),
         payment_method: paymentMethod,
-        payment_proof: paymentMethod === 'cashier' ? 'cashier' : paymentProof,
+        payment_proof: paymentMethod === 'cashier' ? 'cashier' : (usesXendit ? `xendit:${qrisPayment.paymentRequestId}` : paymentProof),
         status: 'pending_confirmation',
         notes: null,
         table_id: tableId === 'takeaway' || !tableId ? null : tableId,
@@ -215,26 +285,22 @@ function CustomerOrderFormContent() {
         updated_at: now
       };
 
-      const { error: orderError } = await supabase
-        .from('customer_orders')
-        .insert(orderPayload);
-
-      if (orderError) throw orderError;
-
-      const itemInsertions = Object.values(cart).map(item => ({
-        id: `${orderId}-${item.product.id}`,
-        order_id: orderId,
-        product_id: item.product.id,
-        quantity: item.qty,
-        price: item.product.sellPrice,
-        subtotal: item.product.sellPrice * item.qty
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('customer_order_items')
-        .insert(itemInsertions);
-
-      if (itemsError) throw itemsError;
+      const response = await fetch('/api/public/orders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-tenant-slug': tenantSlug },
+        body: JSON.stringify({
+          orderId,
+          customerName,
+          customerEmail,
+          tableId: tableId === 'takeaway' || !tableId ? null : tableId,
+          paymentMethod,
+          paymentProof: usesXendit ? undefined : paymentProof,
+          xenditPaymentRequestId: usesXendit ? qrisPayment.paymentRequestId : undefined,
+          items: Object.values(cart).map((item) => ({ productId: item.product.id, quantity: item.qty })),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Gagal menyimpan pesanan');
 
       // Print simulations
       console.log(t('simEmailSentCustomer', { email: customerEmail, id: orderId, status: 'Pending Confirmation' }));
@@ -249,7 +315,7 @@ function CustomerOrderFormContent() {
       });
 
       setSubmittedOrderId(orderId);
-      setSubmittedOrder(orderPayload as any);
+      setSubmittedOrder(orderPayload);
       setStep(5);
     } catch (err) {
       console.error('Failed to submit order:', err);
@@ -273,8 +339,8 @@ function CustomerOrderFormContent() {
         if (data && !error) {
           if (submittedOrder && submittedOrder.status !== data.status) {
             console.log(t('simEmailStatusChanged', { email: customerEmail, id: submittedOrderId, status: data.status }));
-            toast.success(`Status pesanan diperbarui ke: ${t(data.status as any)}`);
-            toast(`📧 [Notifikasi] Simulasi email pembaruan status (${t(data.status as any)}) dikirim ke ${customerEmail}`, {
+            toast.success(`Status pesanan diperbarui ke: ${t(data.status as TranslationKey)}`);
+            toast(`📧 [Notifikasi] Simulasi email pembaruan status (${t(data.status as TranslationKey)}) dikirim ke ${customerEmail}`, {
               icon: '✉️',
               duration: 4000
             });
@@ -287,7 +353,7 @@ function CustomerOrderFormContent() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [submittedOrderId, step, submittedOrder]);
+  }, [submittedOrderId, step, submittedOrder, customerEmail, t]);
 
   const handleTrackLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,8 +387,14 @@ function CustomerOrderFormContent() {
         `)
         .eq('order_id', orderData.id);
 
-      const mappedItems = (itemsData || []).map(item => {
-        const prodName = (item as any).products?.name || 'Unknown Product';
+      const mappedItems = ((itemsData || []) as Array<{
+        quantity: number;
+        price: number;
+        subtotal: number;
+        product_id: string;
+        products?: { name?: string } | null;
+      }>).map(item => {
+        const prodName = item.products?.name || 'Unknown Product';
         return {
           quantity: item.quantity,
           price: item.price,
@@ -920,14 +992,22 @@ function CustomerOrderFormContent() {
                   {paymentMethod === 'qris' && (
                     <div className="space-y-4 flex flex-col items-center">
                       <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
-                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={settings.qrisImage || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POS_RESTO_QRIS_DUMMY'}
-                          alt="QRIS QR Code"
-                          className="w-36 h-36 object-contain"
-                        />
-                      </div>
+                      {qrisPayment.loading ? (
+                        <div className="w-36 h-36 bg-white border rounded-2xl flex items-center justify-center text-xs text-slate-500">Menyiapkan QRIS...</div>
+                      ) : qrisPayment.qrImage ? (
+                        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={qrisPayment.qrImage} alt="QRIS QR Code" className="w-36 h-36 object-contain" />
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl bg-rose-50 text-rose-700 text-xs">{qrisPayment.error || 'QRIS belum dikonfigurasi'}</div>
+                      )}
+                      {qrisPayment.mode === 'xendit' && (
+                        <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${qrisPayment.status === 'SUCCEEDED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {qrisPayment.status === 'SUCCEEDED' ? 'Pembayaran diterima' : 'Menunggu pembayaran Xendit'}
+                        </div>
+                      )}
+                      {qrisPayment.mode === 'static' && <p className="text-[11px] text-amber-700">Mode QRIS statis: unggah bukti pembayaran di bawah.</p>}
                       <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
                         Total: Rp {getTotal().toLocaleString('id-ID')}
                       </div>
@@ -1018,36 +1098,7 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Upload Proof Area */}
-                {paymentMethod !== 'cashier' && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
-
-                    <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 hover:bg-white rounded-2xl p-6 transition-all duration-300 text-center shadow-sm">
-                      <input
-                        type="file"
-                        accept="image/png, image/jpeg, image/jpg, application/pdf"
-                        onChange={handleFileChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-
-                      <div className="space-y-2 flex flex-col items-center">
-                        <Upload size={32} className="text-slate-400 animate-bounce" style={{ animationDuration: '2s' }} />
-                        {paymentProofName ? (
-                          <div className="flex items-center space-x-1.5 text-emerald-600 font-black animate-in zoom-in duration-300">
-                            <CheckCircle size={16} />
-                            <span className="text-sm truncate max-w-[240px]">{paymentProofName}</span>
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-sm font-bold text-slate-700">{t('dragDrop')}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">{t('uploadProofDesc', { size: settings.maxFileSize || 5 })}</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {paymentMethod !== 'cashier' && (
+                {paymentMethod !== 'cashier' && !(paymentMethod === 'qris' && qrisPayment.mode === 'xendit') && (
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
 
@@ -1089,7 +1140,7 @@ function CustomerOrderFormContent() {
                   </button>
                   <button
                     onClick={handleSubmitOrder}
-                    disabled={loading || (paymentMethod !== 'cashier' && !paymentProof)}
+                    disabled={loading || (paymentMethod !== 'cashier' && !(paymentMethod === 'qris' && qrisPayment.status === 'SUCCEEDED') && !paymentProof)}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl shadow-md shadow-emerald-500/15 flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >
                     {loading ? (

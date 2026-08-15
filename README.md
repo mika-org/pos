@@ -1,14 +1,14 @@
 # RestoFlow POS - Smart & Premium Point of Sale
 
-RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersinkronisasi ke cloud yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **Supabase**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
+RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
 
 ---
 
 ## 🌟 Fitur Utama (Key Features)
 
-### 1. Sistem Autentikasi Modern (JWT & Session Sync)
+### 1. Sistem Autentikasi Server-side
 - Desain login premium dengan ambient mesh gradient & show/hide password toggle.
-- Flow otentikasi client-side menggunakan token **JWT** (`localStorage`).
+- Sesi ditandatangani server dan disimpan pada cookie `HttpOnly`, `SameSite=Lax`, dan `Secure` di production.
 - Proteksi route admin/cashier otomatis melalui `AuthProvider` (pengalihan otomatis jika belum login / sesi berakhir).
 
 ### 2. POS Kasir (Cashier POS)
@@ -22,8 +22,8 @@ RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan ters
 - Deteksi otomatis nomor meja melalui query parameter URL (Contoh: `/order?table=meja_01` mengunci pilihan ke "Meja 01").
 - Wizard multi-langkah interaktif: Informasi Pelanggan ➡️ Pilih Menu ➡️ Rincian & Pajak ➡️ Pembayaran Bank Transfer/QRIS (dengan pengunggahan bukti bayar) ➡️ Selesai & Pelacakan.
 
-### 4. Notifikasi Pesanan Masuk Real-time
-- Integrasi channel realtime Supabase untuk mendeteksi pesanan meja baru seketika.
+### 4. Notifikasi Pesanan Masuk
+- Polling API PostgreSQL tenant-scoped untuk mendeteksi pesanan meja baru tanpa koneksi Supabase di browser.
 - **Audio Chime**: Memainkan efek suara lonceng ("ding-dong") menggunakan Web Audio API.
 - **Visual Alert Toast**: Kartu notifikasi melayang (toast alert) berisi ID, nama pelanggan, lokasi meja, dan total pembayaran.
 - **Header Notification Center**: Lencana (badge) counter aktif yang membal pada ikon Bell. Ketika diklik, menampilkan dropdown 5 transaksi pending terbaru.
@@ -51,93 +51,53 @@ RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan ters
 ### 8. Pengaturan & Laporan (Settings & Reports)
 - **Settings**: Konfigurasi profil toko, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen banyak rekening bank transfer toko.
 - **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi (gabungan POS & order meja) dengan kolom sumber (POS Kasir / Pesanan Meja) serta ekspor CSV.
-- **Backup**: Pencadangan database dari cloud Supabase ke format file JSON secara instan.
+- **Backup**: Pencadangan data tenant dari PostgreSQL ke format file JSON secara instan.
 
 ---
 
-## 🛠️ Cara Migrasi Database (Supabase Migrations)
+## 🛠️ PostgreSQL, Prisma, dan Migrasi Supabase
 
-RestoFlow menyediakan **dua cara** untuk menerapkan migrasi database:
+Seluruh akses database berjalan melalui Route Handler server-side dan Prisma. Setiap tabel bisnis memiliki `tenantId`; browser tidak pernah menerima connection string, hash password, atau API key Xendit.
 
-### Cara A: Migration Runner Otomatis (npm run migrate) ✨ Recommended
+### Persiapan
 
-Migration runner bawaan yang membaca semua file SQL dari `supabase/migrations/` dan menerapkannya secara otomatis tanpa perlu Supabase CLI.
+Salin `.env.example` menjadi `.env`, lalu isi `DATABASE_URL`, secret sesi/enkripsi, akun seed, dan koneksi sumber Supabase bila data lama akan diimpor. Jangan commit file `.env`.
 
-#### Persiapan
-
-1. **Buat file `.env.local`** di root project (salin dari `.env.example`):
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
-   > Temukan key di: Supabase Dashboard → Settings → API
-
-2. **Buat fungsi helper SQL** di Supabase SQL Editor (sekali saja):
-   ```sql
-   CREATE OR REPLACE FUNCTION public.exec_sql(sql text)
-   RETURNS void AS $$
-   BEGIN
-     EXECUTE sql;
-   END;
-   $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-   GRANT EXECUTE ON FUNCTION public.exec_sql TO service_role;
-   ```
-
-#### Perintah Migrasi
+### Perintah database
 
 | Perintah | Keterangan |
 |---|---|
-| `npm run migrate` | Terapkan semua migrasi yang belum dijalankan |
-| `npm run migrate:dry` | Lihat daftar file yang akan dijalankan tanpa mengubah database |
-| `npm run migrate:file 20260622000001` | Jalankan file migrasi tertentu saja |
+| `npm run db:ensure` | Buat database dari nama di `DATABASE_URL` bila belum ada |
+| `npm run db:generate` | Generate Prisma Client |
+| `npm run db:migrate` | Terapkan migration Prisma yang belum dijalankan |
+| `npm run db:seed` | Seed tenant awal, Super Admin, admin tenant, kategori, produk, meja, dan settings |
+| `npm run db:verify` | Verifikasi migration, jumlah seed, dan hash kredensial pada database target |
+| `npm run migrate:supabase:dry` | Hitung row Supabase tanpa menulis PostgreSQL |
+| `npm run migrate:supabase` | Import seluruh tabel dan file Base64/Storage Supabase secara idempotent |
+
+Urutan deployment baru:
 
 ```bash
-# Preview apa yang akan dijalankan
-npm run migrate:dry
-
-# Terapkan semua migrasi
-npm run migrate
+npm install
+npm run db:ensure
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run migrate:supabase:dry
+npm run migrate:supabase
 ```
 
-Migration runner secara otomatis:
-- ✅ Membaca semua `.sql` dari `supabase/migrations/` (urut berdasarkan nama file)
-- ✅ Melacak migrasi yang sudah diterapkan di tabel `migrations_log`
-- ✅ Melewati file yang sudah dijalankan sebelumnya (idempotent)
-- ✅ Memeriksa koneksi fallback dari `lib/supabase.ts` jika tidak ada `.env.local`
+Importer menggunakan `SUPABASE_SOURCE_SECRET_KEY` atau legacy `SUPABASE_SOURCE_SERVICE_ROLE_KEY` bila tersedia dan hanya memakai anon key sebagai fallback. Data URL gambar produk, QRIS, dan bukti bayar dipindahkan ke tabel `stored_files` (`bytea`) dan dilayani melalui `/api/storage/:id`.
 
----
+Jika migrator melaporkan `NXDOMAIN`, project URL sumber sudah tidak terdaftar di DNS. Periksa project ref di Supabase Dashboard dan lakukan **Resume project** bila project masih paused. Jika project sudah dihapus atau melewati masa pemulihan, REST API tidak dapat dipakai; unduh database backup dan Storage objects yang masih tersedia, lalu pulihkan ke project Supabase baru sebelum menjalankan importer. API secret/service-role hanya disimpan di `.env` dan tidak boleh memakai prefix `NEXT_PUBLIC_`.
 
-### Cara B: Supabase CLI (npx supabase)
+### Multi-tenant dan pembayaran
 
-Menggunakan official Supabase CLI untuk link dan push migrasi.
-
-#### 1. Hubungkan Project ke Supabase
-```bash
-npm run supabase:link
-```
-*Anda akan diminta untuk memasukkan **Project Reference ID** dan **Database Password** proyek Supabase Anda.*
-
-#### 2. Jalankan Migrasi (Push Migrations)
-```bash
-npm run supabase:push
-```
-*Terapkan semua file migrasi skema database lokal ke database remote Supabase.*
-
-#### 3. Cek Status Migrasi
-```bash
-npm run supabase:status
-```
-
----
-
-### File Migrasi yang Tersedia
-
-| File | Keterangan |
-|---|---|
-| `20260622000000_initial_schema.sql` | Skema lengkap: semua tabel, RLS, policy, dan data awal meja |
-| `20260622000001_orders_realtime.sql` | Aktifkan Supabase Realtime untuk `customer_orders` + seed data dummy produk & settings |
+- Super Admin masuk tanpa kode tenant lalu mengelola tenant di `/super-admin/tenants`.
+- Admin/kasir masuk dengan email dan kode tenant. Semua query server otomatis dibatasi ke tenant sesi.
+- Link QR meja menyertakan `tenant=<slug>` agar halaman self-order memilih tenant yang benar.
+- Admin tenant dapat mengisi Secret API Key dan callback token Xendit di Pengaturan. Secret disimpan dengan AES-256-GCM.
+- QRIS memakai Xendit Payments API v3 saat aktif. Bila key kosong/nonaktif atau Xendit gagal, aplikasi otomatis memakai gambar QRIS statis dan meminta bukti bayar.
 
 ---
 
@@ -148,13 +108,12 @@ npm run supabase:status
 npm install
 ```
 
-### 2. Terapkan Migrasi Database
+### 2. Terapkan Database
 ```bash
-# Review dulu
-npm run migrate:dry
-
-# Lalu terapkan
-npm run migrate
+npm run db:ensure
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 ```
 
 ### 3. Jalankan Server Development
@@ -164,8 +123,10 @@ npm run dev
 
 Akses aplikasi di browser melalui:
 - Panel Kasir/Admin: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-  - *Akun Admin Bawaan:* `admin@store.com` / `admin123`
-- Halaman Order Meja: [http://localhost:3000/order?table=meja_01](http://localhost:3000/order?table=meja_01)
+- Super Admin: [http://localhost:3000/super-admin/tenants](http://localhost:3000/super-admin/tenants)
+- Halaman Order Meja: [http://localhost:3000/order?table=meja_01&tenant=restoflow](http://localhost:3000/order?table=meja_01&tenant=restoflow)
+
+Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment saat seed dijalankan.
 
 ---
 
@@ -181,12 +142,14 @@ pos/
 │   └── ...                 # pages lainnya
 ├── components/             # React components
 │   └── layout/             # Header, Sidebar, AuthProvider
-├── lib/                    # Utilities: db types, supabase client, jwt, translations
+├── lib/                    # Prisma, auth session, tenant context, storage, Xendit, translations
+├── prisma/                 # Schema, migration, dan seed PostgreSQL
 ├── scripts/
-│   └── migrate.js          # ✨ Migration runner otomatis
+│   ├── ensure-database.mjs
+│   ├── migrate-supabase-to-postgres.mjs
+│   └── verify-database.mjs
 ├── stores/                 # Zustand state stores
-├── supabase/
-│   └── migrations/         # File SQL migrasi database (urut timestamp)
+├── supabase/               # Arsip migration sumber lama
 ├── .env.example            # Template variabel environment
 └── README.md
 ```

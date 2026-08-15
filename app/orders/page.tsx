@@ -115,7 +115,7 @@ function AdminOrdersPageContent() {
         `)
         .eq('order_id', orderId);
 
-      const mappedItems = (itemsData || []).map(item => {
+      const mappedItems = ((itemsData || []) as any[]).map(item => {
         const prodName = (item as any).products?.name || 'Unknown Product';
         return {
           id: item.id,

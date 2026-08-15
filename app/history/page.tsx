@@ -103,7 +103,7 @@ export default function HistoryPage() {
 
       if (error) throw error;
 
-      const mappedItems = (itemsData || []).map(item => ({
+      const mappedItems = ((itemsData || []) as any[]).map(item => ({
         id: item.id,
         transactionId: item.order_id,
         productId: item.product_id,
@@ -342,4 +342,3 @@ export default function HistoryPage() {
     </div>
   );
 }
-

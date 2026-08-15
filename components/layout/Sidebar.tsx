@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { 
   LayoutDashboard, ShoppingCart, Users, Package, FileText, Settings, 
-  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight 
+  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight, Building2
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/stores/languageStore';
@@ -17,11 +17,13 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUiStore();
   const pathname = usePathname();
   const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const [mounted, setMounted] = useState(false);
 
   // Avoid hydration mismatch
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const collapsed = mounted ? sidebarCollapsed : false;
@@ -115,6 +117,18 @@ export function Sidebar() {
 
         {/* Navigation Menu Links */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-none">
+          {isSuperAdmin ? (
+            <Link
+              href="/super-admin/tenants"
+              onClick={handleLinkClick}
+              className={getLinkClass('/super-admin/tenants')}
+              title="Kontrol Multi-Tenant"
+            >
+              <Building2 className={getIconClass('/super-admin/tenants', 'text-slate-400')} size={18} />
+              {!collapsed && <span className="text-xs font-semibold">Kontrol Multi-Tenant</span>}
+            </Link>
+          ) : (
+            <>
           
           {/* Dashboard */}
           <Link 
@@ -254,6 +268,8 @@ export function Sidebar() {
                 <Settings className={getIconClass('/settings', 'text-slate-450')} size={18} />
                 {!collapsed && <span className="text-xs font-semibold animate-in fade-in duration-200">{t('settings')}</span>}
               </Link>
+            </>
+          )}
             </>
           )}
         </nav>

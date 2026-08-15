@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DiningTable } from '@/lib/db';
 import { useTranslation } from '@/stores/languageStore';
-import { Plus, Edit2, Trash2, Search, QrCode, Printer, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, QrCode, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { useAuthStore } from '@/stores/authStore';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ import {
 
 export default function TablesPage() {
   const { t } = useTranslation();
+  const tenantSlug = useAuthStore((state) => state.user?.tenantSlug);
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +55,8 @@ export default function TablesPage() {
   };
 
   useEffect(() => {
-    fetchTables();
+    const timer = window.setTimeout(() => void fetchTables(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const openAddModal = () => {
@@ -144,13 +147,8 @@ export default function TablesPage() {
     setIsQrModalOpen(true);
   };
 
-  const closeQrModal = () => {
-    setIsQrModalOpen(false);
-    setSelectedTable(null);
-  };
-
   const handlePrint = (table: DiningTable) => {
-    const tableOrderUrl = `${window.location.origin}/order?table=${table.id}`;
+    const tableOrderUrl = `${window.location.origin}/order?table=${encodeURIComponent(table.id)}&tenant=${encodeURIComponent(tenantSlug || '')}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(tableOrderUrl)}`;
     
     const printWindow = window.open('', '_blank');
@@ -413,7 +411,7 @@ export default function TablesPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                    typeof window !== 'undefined' ? `${window.location.origin}/order?table=${selectedTable.id}` : ''
+                    typeof window !== 'undefined' ? `${window.location.origin}/order?table=${encodeURIComponent(selectedTable.id)}&tenant=${encodeURIComponent(tenantSlug || '')}` : ''
                   )}`} 
                   alt={`QR Code ${selectedTable.name}`}
                   className="w-48 h-48 block"

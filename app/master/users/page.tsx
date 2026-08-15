@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { AppUser } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
 import { useAuthStore } from '@/stores/authStore';
 import { Plus, Search, Edit2, Trash2, Users, Shield, Key } from 'lucide-react';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -50,7 +49,8 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    const timer = window.setTimeout(() => void fetchUsers(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const filteredUsers = users.filter(u => 
@@ -68,7 +68,7 @@ export default function UsersPage() {
       setFormData({
         name: user.name,
         email: user.email,
-        password: user.password || '',
+        password: '',
         role: user.role
       });
       setEditingId(user.id!.toString());
@@ -83,24 +83,22 @@ export default function UsersPage() {
     if (!isAdmin) return;
 
     try {
-      const hashPasswordIfNeeded = (pass: string) => {
-        if (pass.startsWith('$2a$') || pass.startsWith('$2b$') || pass.startsWith('$2y$')) {
-          return pass;
-        }
-        const salt = bcrypt.genSaltSync(10);
-        return bcrypt.hashSync(pass, salt);
+      if (!editingId && !formData.password) {
+        toast.error('Password wajib diisi untuk pengguna baru');
+        return;
+      }
+      const userData: { name: string; email: string; role: 'admin' | 'kasir'; password?: string } = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
       };
-
-      const hashedPassword = hashPasswordIfNeeded(formData.password);
+      if (formData.password) userData.password = formData.password;
 
       if (editingId) {
         const { error } = await supabase
           .from('users')
           .update({
-            name: formData.name,
-            email: formData.email,
-            password: hashedPassword,
-            role: formData.role,
+            ...userData,
             updatedAt: Date.now()
           })
           .eq('id', editingId);
@@ -110,10 +108,7 @@ export default function UsersPage() {
           .from('users')
           .insert({
             id: crypto.randomUUID(),
-            name: formData.name,
-            email: formData.email,
-            password: hashedPassword,
-            role: formData.role,
+            ...userData,
             createdAt: Date.now(),
             updatedAt: Date.now(),
             deleted: false
@@ -298,15 +293,15 @@ export default function UsersPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Password Lokal</label>
+                <label className="text-sm font-medium text-slate-700">Password {editingId ? '(kosongkan jika tidak diubah)' : ''}</label>
                 <div className="relative">
                   <Key size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                   <input 
-                    type="text" 
+                    type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                    required
+                    required={!editingId}
                   />
                 </div>
                 <p className="text-xs text-slate-400">Gunakan password yang mudah diingat untuk login mesin kasir.</p>

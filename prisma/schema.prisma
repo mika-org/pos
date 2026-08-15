@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum UserRole {
+  super_admin
+  admin
+  kasir
+}
+
+model Tenant {
+  id               String              @id @default(uuid())
+  slug             String              @unique
+  name             String
+  status           TenantStatus        @default(active)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  users            User[]
+  categories       Category[]
+  products         Product[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  transactions     Transaction[]
+  transactionItems TransactionItem[]
+  settings         StoreSettings[]
+  diningTables     DiningTable[]
+  customerOrders   CustomerOrder[]
+  orderItems       CustomerOrderItem[]
+  files            StoredFile[]
+  paymentAttempts  PaymentAttempt[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  password  String?
+  role      UserRole
+  createdAt BigInt   @map("createdAt")
+  updatedAt BigInt   @map("updatedAt")
+  deleted   Boolean  @default(false)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, deleted])
+  @@map("users")
+}
+
+model Category {
+  tenantId  String
+  id        String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt BigInt    @map("createdAt")
+  updatedAt BigInt    @map("updatedAt")
+  deleted   Boolean   @default(false)
+  products  Product[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, deleted])
+  @@map("categories")
+}
+
+model Product {
+  tenantId   String
+  id         String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  categoryId String              @map("categoryId")
+  category   Category            @relation(fields: [tenantId, categoryId], references: [tenantId, id], onDelete: Restrict)
+  barcode    String?
+  buyPrice   BigInt              @map("buyPrice")
+  sellPrice  BigInt              @map("sellPrice")
+  stock      BigInt
+  imageUrl   String?             @map("imageUrl")
+  createdAt  BigInt              @map("createdAt")
+  updatedAt  BigInt              @map("updatedAt")
+  deleted    Boolean             @default(false)
+  orderItems CustomerOrderItem[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, deleted])
+  @@map("products")
+}
+
+model Customer {
+  tenantId  String
+  id        String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String
+  address   String?
+  createdAt BigInt  @map("createdAt")
+  updatedAt BigInt  @map("updatedAt")
+  deleted   Boolean @default(false)
+
+  @@id([tenantId, id])
+  @@index([tenantId, deleted])
+  @@map("customers")
+}
+
+model Supplier {
+  tenantId  String
+  id        String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String
+  address   String?
+  createdAt BigInt  @map("createdAt")
+  updatedAt BigInt  @map("updatedAt")
+  deleted   Boolean @default(false)
+
+  @@id([tenantId, id])
+  @@index([tenantId, deleted])
+  @@map("suppliers")
+}
+
+model Transaction {
+  tenantId      String
+  id            String
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  no            String
+  date          BigInt
+  customerId    String?           @map("customerId")
+  subtotal      BigInt
+  discount      BigInt
+  tax           BigInt
+  total         BigInt
+  paymentMethod String            @map("paymentMethod")
+  amountPaid    BigInt            @map("amountPaid")
+  change        BigInt
+  note          String?
+  status        String
+  userId        String?           @map("userId")
+  createdAt     BigInt            @map("createdAt")
+  updatedAt     BigInt            @map("updatedAt")
+  items         TransactionItem[]
+
+  @@id([tenantId, id])
+  @@unique([tenantId, no])
+  @@index([tenantId, date])
+  @@map("transactions")
+}
+
+model TransactionItem {
+  tenantId      String
+  id            String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactionId String      @map("transactionId")
+  transaction   Transaction @relation(fields: [tenantId, transactionId], references: [tenantId, id], onDelete: Cascade)
+  productId     String      @map("productId")
+  productName   String      @map("productName")
+  price         BigInt
+  qty           BigInt
+  discount      BigInt
+  subtotal      BigInt
+
+  @@id([tenantId, id])
+  @@index([tenantId, transactionId])
+  @@map("transaction_items")
+}
+
+model StoreSettings {
+  tenantId                     String
+  id                           String  @default("default")
+  tenant                       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  storeName                    String  @default("POS System") @map("storeName")
+  storeAddress                 String  @default("-") @map("storeAddress")
+  storePhone                   String  @default("-") @map("storePhone")
+  taxPercentage                BigInt  @default(0) @map("taxPercentage")
+  qrisImage                    String? @map("qrisImage")
+  maxFileSize                  BigInt  @default(5) @map("maxFileSize")
+  bankAccounts                 String  @default("[]") @map("bank_accounts")
+  xenditEnabled                Boolean @default(false) @map("xendit_enabled")
+  xenditEnvironment            String  @default("development") @map("xendit_environment")
+  xenditSecretKeyEncrypted     String? @map("xendit_secret_key_encrypted") @db.Text
+  xenditCallbackTokenEncrypted String? @map("xendit_callback_token_encrypted") @db.Text
+  updatedAt                    BigInt  @map("updatedAt")
+
+  @@id([tenantId, id])
+  @@map("settings")
+}
+
+model DiningTable {
+  tenantId  String
+  id        String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  status    String          @default("active")
+  createdAt BigInt          @map("created_at")
+  updatedAt BigInt          @map("updated_at")
+  orders    CustomerOrder[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, status])
+  @@map("tables")
+}
+
+model CustomerOrder {
+  tenantId               String
+  id                     String
+  tenant                 Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerName           String              @map("customer_name")
+  customerEmail          String              @map("customer_email")
+  totalAmount            BigInt              @map("total_amount")
+  paymentMethod          String              @map("payment_method")
+  paymentProof           String              @map("payment_proof") @db.Text
+  paymentStatus          String              @default("pending") @map("payment_status")
+  xenditPaymentRequestId String?             @map("xendit_payment_request_id")
+  status                 String
+  verifiedBy             String?             @map("verified_by")
+  verifiedAt             BigInt?             @map("verified_at")
+  notes                  String?
+  tableId                String?             @map("table_id")
+  diningTable            DiningTable?        @relation(fields: [tenantId, tableId], references: [tenantId, id], onDelete: Restrict)
+  createdAt              BigInt              @map("created_at")
+  updatedAt              BigInt              @map("updated_at")
+  items                  CustomerOrderItem[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, status, createdAt])
+  @@index([xenditPaymentRequestId])
+  @@map("customer_orders")
+}
+
+model CustomerOrderItem {
+  tenantId  String
+  id        String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId   String        @map("order_id")
+  order     CustomerOrder @relation(fields: [tenantId, orderId], references: [tenantId, id], onDelete: Cascade)
+  productId String        @map("product_id")
+  product   Product       @relation(fields: [tenantId, productId], references: [tenantId, id], onDelete: Restrict)
+  quantity  BigInt
+  price     BigInt
+  subtotal  BigInt
+
+  @@id([tenantId, id])
+  @@index([tenantId, orderId])
+  @@map("customer_order_items")
+}
+
+model StoredFile {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind      String
+  filename  String
+  mimeType  String   @map("mime_type")
+  size      Int
+  data      Bytes
+  isPublic  Boolean  @default(false) @map("is_public")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, kind])
+  @@map("stored_files")
+}
+
+model PaymentAttempt {
+  id                String    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  referenceId       String    @map("reference_id")
+  providerRequestId String?   @unique @map("provider_request_id")
+  amount            BigInt
+  status            String
+  mode              String
+  qrString          String?   @map("qr_string") @db.Text
+  failureReason     String?   @map("failure_reason")
+  expiresAt         DateTime? @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, referenceId])
+  @@index([tenantId, status])
+  @@map("payment_attempts")
+}

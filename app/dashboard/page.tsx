@@ -290,7 +290,7 @@ export default function Dashboard() {
           <div className="shrink-0 bg-slate-800/80 backdrop-blur-md border border-slate-700/50 p-4 rounded-2xl flex flex-col md:text-right">
             <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest">Waktu Server</span>
             <span className="text-xs font-black text-slate-100 mt-1">{currentTime}</span>
-            <span className="text-[10px] text-emerald-400 font-bold mt-1">● Connected to Supabase</span>
+            <span className="text-[10px] text-emerald-400 font-bold mt-1">● Connected to PostgreSQL</span>
           </div>
         </div>
       </div>

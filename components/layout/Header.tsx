@@ -14,16 +14,17 @@ import {
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { CustomerOrder } from '@/lib/db';
+import { useAuthStore } from '@/stores/authStore';
 
 export function Header() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const { t, language, setLanguage } = useTranslation();
   const { toggleSidebarMobile } = useUiStore();
   const router = useRouter();
   const [pendingOrders, setPendingOrders] = useState<CustomerOrder[]>([]);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -38,6 +39,7 @@ export function Header() {
 
   // Fetch pending customer orders and subscribe to realtime updates
   useEffect(() => {
+    if (user?.role === 'super_admin') return;
     const fetchPending = async () => {
       try {
         const { data, error } = await supabase
@@ -83,7 +85,7 @@ export function Header() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user?.role]);
 
   return (
     <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-6 transition-all duration-300">

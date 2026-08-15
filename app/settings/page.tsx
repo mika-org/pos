@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { Save, Store, Calculator, Database, Download, Cloud, QrCode, UploadCloud, X, Landmark, Plus, Trash2 } from 'lucide-react';
-import { exportSupabaseDb } from '@/lib/backupUtils';
+import { Save, Store, Calculator, Database, Cloud, QrCode, UploadCloud, X, Landmark, Plus, Trash2, KeyRound, ShieldCheck } from 'lucide-react';
+import { exportPostgresDb } from '@/lib/backupUtils';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/stores/languageStore';
 
@@ -12,6 +12,9 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [newBank, setNewBank] = useState({ bankName: '', accountNumber: '', accountHolder: '' });
+  const [xenditForm, setXenditForm] = useState({ enabled: false, environment: 'development' as 'development' | 'production', secretKey: '', callbackToken: '' });
+  const [xenditConfigured, setXenditConfigured] = useState(false);
+  const [callbackConfigured, setCallbackConfigured] = useState(false);
   const { t } = useTranslation();
 
   const addBankAccount = () => {
@@ -45,8 +48,21 @@ export default function SettingsPage() {
 
   // Sync state if store updates from elsewhere
   useEffect(() => {
-    setFormData(settings);
+    const timer = window.setTimeout(() => setFormData(settings), 0);
+    return () => window.clearTimeout(timer);
   }, [settings]);
+
+  useEffect(() => {
+    const loadPaymentSettings = async () => {
+      const response = await fetch('/api/payment-settings', { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json();
+      setXenditForm((current) => ({ ...current, enabled: data.enabled, environment: data.environment }));
+      setXenditConfigured(Boolean(data.configured));
+      setCallbackConfigured(Boolean(data.callbackConfigured));
+    };
+    void loadPaymentSettings();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -84,8 +100,18 @@ export default function SettingsPage() {
     
     try {
       await updateSettings(formData);
+      const paymentResponse = await fetch('/api/payment-settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(xenditForm),
+      });
+      const paymentData = await paymentResponse.json();
+      if (!paymentResponse.ok) throw new Error(paymentData.error || 'Gagal menyimpan Xendit');
+      setXenditConfigured(Boolean(paymentData.configured));
+      setCallbackConfigured(Boolean(paymentData.callbackConfigured));
+      setXenditForm((current) => ({ ...current, secretKey: '', callbackToken: '' }));
       toast.success('Pengaturan berhasil disimpan!');
-    } catch (err) {
+    } catch {
       toast.error('Gagal menyimpan pengaturan.');
     } finally {
       setIsSaving(false);
@@ -243,6 +269,47 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Xendit Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
+            <ShieldCheck className="text-indigo-500" />
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Xendit QRIS Dinamis</h2>
+              <p className="text-xs text-slate-500">Secret key terenkripsi dan hanya dipakai oleh server tenant ini.</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <label className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <span>
+                <span className="block text-sm font-bold text-slate-800">Aktifkan Xendit</span>
+                <span className="block text-xs text-slate-500">Jika tidak aktif/tidak tersedia, sistem memakai gambar QRIS statis di atas.</span>
+              </span>
+              <input type="checkbox" checked={xenditForm.enabled} onChange={(event) => setXenditForm({ ...xenditForm, enabled: event.target.checked })} className="w-5 h-5" />
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Environment</label>
+                <select value={xenditForm.environment} onChange={(event) => setXenditForm({ ...xenditForm, environment: event.target.value as 'development' | 'production' })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-white">
+                  <option value="development">Development / Test</option>
+                  <option value="production">Production / Live</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Secret API Key {xenditConfigured && <span className="text-emerald-600">(sudah tersimpan)</span>}</label>
+                <div className="relative">
+                  <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="password" value={xenditForm.secretKey} onChange={(event) => setXenditForm({ ...xenditForm, secretKey: event.target.value })} placeholder={xenditConfigured ? 'Kosongkan untuk mempertahankan key' : 'xnd_development_...'} className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl" />
+                </div>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700">Webhook Callback Token {callbackConfigured && <span className="text-emerald-600">(sudah tersimpan)</span>}</label>
+                <input type="password" value={xenditForm.callbackToken} onChange={(event) => setXenditForm({ ...xenditForm, callbackToken: event.target.value })} placeholder={callbackConfigured ? 'Kosongkan untuk mempertahankan token' : 'Token dari pengaturan webhook Xendit'} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl" />
+                <p className="text-xs text-slate-500">Webhook URL: <code>/api/payments/xendit/webhook</code></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Bank Accounts Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
           <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center space-x-3">
@@ -347,14 +414,14 @@ export default function SettingsPage() {
           </div>
           
           <div className="p-6">
-            <p className="text-sm text-slate-500 mb-6">Unduh cadangan (backup) data sistem dalam format JSON langsung dari server cloud (Supabase).</p>
+            <p className="text-sm text-slate-500 mb-6">Unduh cadangan data tenant aktif dalam format JSON langsung dari PostgreSQL.</p>
             
             <div className="flex">
               <button
                 type="button"
                 onClick={async () => {
                   const tid = toast.loading('Memproses backup server...');
-                  const res = await exportSupabaseDb();
+                  const res = await exportPostgresDb();
                   if (res.success) {
                     toast.success('Backup server berhasil diunduh!', { id: tid });
                   } else {
@@ -364,7 +431,7 @@ export default function SettingsPage() {
                 className="flex flex-1 items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-medium transition-colors"
               >
                 <Cloud size={18} />
-                <span>Backup Supabase DB (JSON)</span>
+                <span>Backup PostgreSQL Tenant (JSON)</span>
               </button>
             </div>
           </div>

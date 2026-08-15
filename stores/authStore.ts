@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Role = 'admin' | 'kasir';
+export type Role = 'super_admin' | 'admin' | 'kasir';
 
 export interface User {
   id: string;
   email: string;
   role: Role;
   name: string;
+  tenantId?: string | null;
+  tenantSlug?: string | null;
+  tenantName?: string | null;
 }
 
 interface AuthState {
@@ -25,7 +28,8 @@ export const useAuthStore = create<AuthState>()(
       login: (user) => set({ user, isAuthenticated: true }),
       logout: () => {
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('pos_jwt_token');
+          localStorage.removeItem('pos_tenant_slug');
+          void fetch('/api/auth/logout', { method: 'POST' });
         }
         set({ user: null, isAuthenticated: false });
       },

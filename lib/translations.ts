@@ -47,7 +47,6 @@ export const translations = {
     
     paymentMethod: "Metode Pembayaran",
     cashier: "Bayar di Kasir",
-    cashierDesc: "Silakan menuju ke kasir dan sebutkan ID Pesanan Anda setelah mengirim pesanan untuk melakukan pembayaran.",
     orderSuccessCashierDesc: "Silakan lakukan pembayaran langsung di kasir dengan menyebutkan ID Pesanan Anda. Setelah dikonfirmasi, dapur akan segera memasak pesanan Anda.",
     qrisDesc: "Pindai kode QRIS di bawah ini dengan aplikasi e-wallet / mobile banking Anda:",
     bankTransferDesc: "Silakan transfer total pembayaran ke rekening bank berikut:",
@@ -224,7 +223,6 @@ export const translations = {
     
     paymentMethod: "Payment Method",
     cashier: "Pay at Cashier",
-    cashierDesc: "Please proceed to the cashier and mention your Order ID after submitting your order to make payment.",
     orderSuccessCashierDesc: "Please make payment directly at the cashier by mentioning your Order ID. Once confirmed, the kitchen will start preparing your order.",
     qrisDesc: "Scan the QRIS code below with your e-wallet / mobile banking app:",
     bankTransferDesc: "Please transfer the total payment to the following bank account:",

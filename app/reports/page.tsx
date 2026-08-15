@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Transaction } from '@/lib/db';
+import { CustomerOrder, Transaction } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { Download, Search, FileText, TrendingUp, Tag, Banknote, RefreshCw } from 'lucide-react';
@@ -52,9 +52,9 @@ export default function ReportsPage() {
         if (transactionsRes.error) throw transactionsRes.error;
         if (customerOrdersRes.error) throw customerOrdersRes.error;
 
-        const txs = transactionsRes.data || [];
-        const cos = customerOrdersRes.data || [];
-        const productsList = productsRes.data || [];
+        const txs = (transactionsRes.data || []) as Transaction[];
+        const cos = (customerOrdersRes.data || []) as CustomerOrder[];
+        const productsList = (productsRes.data || []) as Array<{ id: string; name: string }>;
 
         setTransactions(txs);
         setCustomerOrders(cos);

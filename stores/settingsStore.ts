@@ -8,7 +8,7 @@ export interface BankAccount {
   accountHolder: string;
 }
 
-interface StoreSettings {
+export interface StoreSettings {
   storeName: string;
   storeAddress: string;
   storePhone: string;
@@ -16,6 +16,9 @@ interface StoreSettings {
   qrisImage?: string;
   maxFileSize: number;
   bankAccounts: BankAccount[];
+  xenditEnabled: boolean;
+  xenditConfigured: boolean;
+  xenditEnvironment: 'development' | 'production';
 }
 
 interface SettingsState {
@@ -43,6 +46,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     qrisImage: '',
     maxFileSize: 5,
     bankAccounts: defaultBankAccounts,
+    xenditEnabled: false,
+    xenditConfigured: false,
+    xenditEnvironment: 'development',
   },
   isLoading: false,
   fetchSettings: async () => {
@@ -71,10 +77,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             qrisImage: data.qrisImage || '',
             maxFileSize: data.maxFileSize !== undefined && data.maxFileSize !== null ? Number(data.maxFileSize) : 5,
             bankAccounts: parsedBanks && parsedBanks.length > 0 ? parsedBanks : defaultBankAccounts,
+            xenditEnabled: Boolean(data.xenditEnabled),
+            xenditConfigured: Boolean(data.xenditConfigured),
+            xenditEnvironment: data.xenditEnvironment === 'production' ? 'production' : 'development',
           }
         });
       } else if (error && error.code === 'PGRST116') {
-        // Record doesn't exist on Supabase, insert the default one
+        // Record belum ada di PostgreSQL, buat nilai default untuk tenant ini.
         const defaultSettings = get().settings;
         await supabase.from('settings').insert({
           id: 'default',
@@ -89,7 +98,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         });
       }
     } catch (err) {
-      console.error('Failed to fetch settings from Supabase:', err);
+      console.error('Failed to fetch settings from PostgreSQL:', err);
     } finally {
       set({ isLoading: false });
     }
@@ -112,10 +121,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           updatedAt: Date.now()
         });
       if (error) {
-        console.error('Failed to save settings to Supabase:', error);
+        console.error('Failed to save settings to PostgreSQL:', error);
       }
     } catch (err) {
-      console.error('Failed to save settings to Supabase:', err);
+      console.error('Failed to save settings to PostgreSQL:', err);
     }
   }
 }));

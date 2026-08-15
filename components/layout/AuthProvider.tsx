@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRouter, usePathname } from 'next/navigation';
-import { decodeJWT, isJWTExpired } from '@/lib/jwt';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 const playChime = () => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext
+      || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
     
     // First tone (C5)
     const osc1 = audioCtx.createOscillator();
@@ -48,51 +50,43 @@ const playChime = () => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, login, logout } = useAuthStore();
+  const { isAuthenticated, user, login, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const { fetchSettings } = useSettingsStore();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    setMounted(true);
+    const mountedTimer = window.setTimeout(() => setMounted(true), 0);
 
-    const checkAuth = () => {
-      if (typeof window === 'undefined') return;
-
-      const token = localStorage.getItem('pos_jwt_token');
-      if (token) {
-        const payload = decodeJWT(token);
-        if (payload && !isJWTExpired(payload)) {
-          // Sync payload back to store if we just reloaded the page
-          if (!isAuthenticated) {
-            login({
-              id: payload.id,
-              email: payload.email,
-              role: payload.role,
-              name: payload.name
-            });
-          }
-          fetchSettings();
-        } else {
-          // Expired or invalid token, clear session
-          localStorage.removeItem('pos_jwt_token');
-          logout();
-          router.push('/login');
-        }
+    let cancelled = false;
+    const checkAuth = async () => {
+      const response = await fetch('/api/auth/session', { cache: 'no-store' });
+      if (cancelled) return;
+      if (!response.ok) {
+        logout();
+        router.push('/login');
+        return;
+      }
+      const payload = await response.json();
+      login(payload.user);
+      if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
+      if (payload.user.role === 'super_admin') {
+        if (!pathname.startsWith('/super-admin')) router.push('/super-admin/tenants');
       } else {
-        if (!isAuthenticated) {
-          router.push('/login');
-        }
+        await fetchSettings();
       }
     };
-
-    checkAuth();
-  }, [isAuthenticated, pathname, router, login, logout, fetchSettings]);
+    void checkAuth();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(mountedTimer);
+    };
+  }, [pathname, router, login, logout, fetchSettings]);
 
   // Real-time listener for incoming customer orders
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user?.tenantId) return;
 
     const channel = supabase
       .channel('incoming-orders')
@@ -142,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.tenantId]);
 
   // Avoid hydration mismatch by waiting for client-side render
   if (!mounted) {

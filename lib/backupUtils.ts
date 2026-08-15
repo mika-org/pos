@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-const downloadFile = (data: any, filename: string) => {
+const downloadFile = (data: unknown, filename: string) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -12,12 +12,12 @@ const downloadFile = (data: any, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const exportSupabaseDb = async () => {
+export const exportPostgresDb = async () => {
   try {
-    const data: Record<string, any> = {};
+    const data: Record<string, unknown[]> = {};
     
     // List all tables we want to backup
-    const tables = ['users', 'products', 'categories', 'customers', 'suppliers', 'transactions', 'transaction_items'];
+    const tables = ['users', 'products', 'categories', 'customers', 'suppliers', 'transactions', 'transaction_items', 'settings', 'tables', 'customer_orders', 'customer_order_items'];
     
     for (const tableName of tables) {
       const { data: tableData, error } = await supabase.from(tableName).select('*');
@@ -28,11 +28,11 @@ export const exportSupabaseDb = async () => {
     }
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(data, `supabase_backup_${timestamp}.json`);
+    downloadFile(data, `postgres_backup_${timestamp}.json`);
     
     return { success: true };
-  } catch (error: any) {
-    console.error("Supabase backup failed:", error);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    console.error("PostgreSQL backup failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : 'Backup gagal' };
   }
 };
