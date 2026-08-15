@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { resolveTenantContext } from '@/lib/tenant-context';
 
+type CheckoutProduct = {
+  id: string;
+  name: string;
+  sellPrice: bigint;
+  stock: bigint;
+};
+
 const CheckoutSchema = z.object({
   hold: z.boolean().default(false),
   paymentReferenceId: z.string().min(3).max(100).optional(),
@@ -27,11 +34,17 @@ export async function POST(request: NextRequest) {
   const tenantId = context.tenantId;
   const productIds = [...new Set(items.map((item) => item.productId))];
   const [products, settings] = await Promise.all([
-    prisma.product.findMany({ where: { tenantId, id: { in: productIds }, deleted: false } }),
-    prisma.storeSettings.findUnique({ where: { tenantId_id: { tenantId, id: 'default' } } }),
+    prisma.product.findMany({
+      where: { tenantId, id: { in: productIds }, deleted: false },
+      select: { id: true, name: true, sellPrice: true, stock: true },
+    }) as Promise<CheckoutProduct[]>,
+    prisma.storeSettings.findUnique({
+      where: { tenantId_id: { tenantId, id: 'default' } },
+      select: { taxPercentage: true },
+    }) as Promise<{ taxPercentage: bigint } | null>,
   ]);
   if (products.length !== productIds.length) return NextResponse.json({ error: 'Produk checkout tidak lengkap' }, { status: 409 });
-  const productMap = new Map(products.map((product) => [product.id, product]));
+  const productMap = new Map<string, CheckoutProduct>(products.map((product: CheckoutProduct) => [product.id, product]));
   const insufficientStock = !hold
     ? items.find((item) => productMap.get(item.productId)!.stock < BigInt(item.qty))
     : undefined;
