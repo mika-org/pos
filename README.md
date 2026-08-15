@@ -128,6 +128,16 @@ Akses aplikasi di browser melalui:
 
 Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment saat seed dijalankan.
 
+### Secret deployment GitHub Actions
+
+Workflow VPS memerlukan tiga repository secret berikut sebelum `npm ci` dijalankan:
+
+- `DATABASE_URL`: connection string PostgreSQL production.
+- `SESSION_SECRET`: random secret minimal 32 karakter.
+- `FIELD_ENCRYPTION_KEY`: key Base64 32-byte untuk enkripsi konfigurasi Xendit.
+
+Workflow meneruskan secret tersebut ke shell SSH, menjalankan production build dan `prisma migrate deploy`, lalu memperbarui environment proses PM2. Jangan menaruh nilainya langsung di workflow atau repository.
+
 ---
 
 ## 📁 Struktur Folder Penting
