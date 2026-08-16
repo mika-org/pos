@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "env:check": "node scripts/validate-production-env.mjs",
     "db:generate": "prisma generate",
     "db:ensure": "node scripts/ensure-database.mjs --create",
     "db:migrate": "prisma migrate deploy",

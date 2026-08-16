@@ -128,15 +128,11 @@ Akses aplikasi di browser melalui:
 
 Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment saat seed dijalankan.
 
-### Secret deployment GitHub Actions
+### Environment deployment VPS
 
-Workflow VPS memerlukan tiga repository secret berikut sebelum `npm ci` dijalankan:
+Workflow menggunakan file `/var/www/html/pos/.env` yang tersimpan langsung di VPS. File tersebut wajib berisi minimal `DATABASE_URL`, `SESSION_SECRET`, dan `FIELD_ENCRYPTION_KEY`. Next.js dan Prisma memuat `.env` secara otomatis saat build, migration, dan startup; nilainya tidak perlu disalin ke GitHub Actions secrets.
 
-- `DATABASE_URL`: connection string PostgreSQL production.
-- `SESSION_SECRET`: random secret minimal 32 karakter.
-- `FIELD_ENCRYPTION_KEY`: key Base64 32-byte untuk enkripsi konfigurasi Xendit.
-
-Workflow meneruskan secret tersebut ke shell SSH, menjalankan production build dan `prisma migrate deploy`, lalu memperbarui environment proses PM2. Jangan menaruh nilainya langsung di workflow atau repository.
+File `.env` tetap diabaikan Git, tidak terhapus oleh `git pull` atau `npm ci`, dan sebaiknya dibatasi dengan permission `600`. Workflow memeriksa keberadaan file, memvalidasi format environment dengan `npm run env:check`, kemudian menjalankan production build, `prisma migrate deploy`, dan restart PM2.
 
 ---
 

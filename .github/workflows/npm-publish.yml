@@ -19,18 +19,11 @@ jobs:
       - name: Deploy to VPS
         id: deploy
         uses: appleboy/ssh-action@v1.2.0
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
-          DEFAULT_TENANT_SLUG: restoflow
-          NEXT_PUBLIC_DEFAULT_TENANT_SLUG: restoflow
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          envs: DATABASE_URL,SESSION_SECRET,FIELD_ENCRYPTION_KEY,DEFAULT_TENANT_SLUG,NEXT_PUBLIC_DEFAULT_TENANT_SLUG
           script: |
             set -e
 
@@ -38,11 +31,14 @@ jobs:
 
             git pull origin main
 
-            : "${DATABASE_URL:?Tambahkan GitHub Actions secret DATABASE_URL}"
-            : "${SESSION_SECRET:?Tambahkan GitHub Actions secret SESSION_SECRET}"
-            : "${FIELD_ENCRYPTION_KEY:?Tambahkan GitHub Actions secret FIELD_ENCRYPTION_KEY}"
+            if [ ! -f .env ]; then
+              echo "File /var/www/html/pos/.env tidak ditemukan" >&2
+              exit 1
+            fi
 
             npm ci
+
+            npm run env:check
 
             npm run build
 
