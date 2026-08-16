@@ -22,7 +22,7 @@ export default function RootLayout({
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
         <Toaster position="top-right" />
         <ClientLayout>{children}</ClientLayout>
-        <Analytics />
+        {process.env.VERCEL === '1' ? <Analytics /> : null}
       </body>
     </html>
   );

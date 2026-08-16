@@ -2,7 +2,10 @@ import nextEnv from '@next/env';
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const requiredKeys = ['DATABASE_URL', 'SESSION_SECRET', 'FIELD_ENCRYPTION_KEY'];
+const requiredKeys = [
+  'DATABASE_URL', 'SESSION_SECRET', 'FIELD_ENCRYPTION_KEY', 'DEFAULT_TENANT_SLUG',
+  'SUPER_ADMIN_EMAIL', 'SUPER_ADMIN_PASSWORD', 'TENANT_ADMIN_EMAIL', 'TENANT_ADMIN_PASSWORD',
+];
 const missing = requiredKeys.filter((key) => !process.env[key]);
 if (missing.length > 0) {
   throw new Error(`Environment wajib belum diisi di .env: ${missing.join(', ')}`);

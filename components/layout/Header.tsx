@@ -22,7 +22,7 @@ export function Header() {
   const { toggleSidebarMobile } = useUiStore();
   const router = useRouter();
   const [pendingOrders, setPendingOrders] = useState<CustomerOrder[]>([]);
-  const user = useAuthStore((state) => state.user);
+  const userRole = useAuthStore((state) => state.user?.role);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -39,7 +39,7 @@ export function Header() {
 
   // Fetch pending customer orders and subscribe to realtime updates
   useEffect(() => {
-    if (user?.role === 'super_admin') return;
+    if (!userRole || userRole === 'super_admin') return;
     const fetchPending = async () => {
       try {
         const { data, error } = await supabase
@@ -85,7 +85,7 @@ export function Header() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.role]);
+  }, [userRole]);
 
   return (
     <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-6 transition-all duration-300">

@@ -17,7 +17,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   login: (user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -26,12 +26,17 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       login: (user) => set({ user, isAuthenticated: true }),
-      logout: () => {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('pos_tenant_slug');
-          void fetch('/api/auth/logout', { method: 'POST' });
+      logout: async () => {
+        try {
+          if (typeof window !== 'undefined') {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          }
+        } catch {
+          // State lokal tetap harus dibersihkan bila jaringan terputus.
+        } finally {
+          if (typeof window !== 'undefined') localStorage.removeItem('pos_tenant_slug');
+          set({ user: null, isAuthenticated: false });
         }
-        set({ user: null, isAuthenticated: false });
       },
     }),
     {

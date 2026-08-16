@@ -44,6 +44,8 @@ jobs:
 
             npm run db:migrate
 
+            npm run db:sync-admin-credentials
+
             if pm2 describe pos > /dev/null 2>&1; then
               PORT=3003 pm2 restart pos --update-env
             else

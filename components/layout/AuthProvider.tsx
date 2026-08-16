@@ -64,16 +64,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch('/api/auth/session', { cache: 'no-store' });
       if (cancelled) return;
       if (!response.ok) {
-        logout();
-        router.push('/login');
+        await logout();
+        router.replace('/login');
         return;
       }
       const payload = await response.json();
       login(payload.user);
       if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
       if (payload.user.role === 'super_admin') {
-        if (!pathname.startsWith('/super-admin')) router.push('/super-admin/tenants');
+        if (!pathname.startsWith('/super-admin')) router.replace('/super-admin/tenants');
       } else {
+        if (pathname.startsWith('/super-admin')) {
+          router.replace('/dashboard');
+          return;
+        }
         await fetchSettings();
       }
     };
@@ -152,6 +156,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white space-y-4">
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p className="font-semibold text-sm">Mengalihkan ke halaman login...</p>
+      </div>
+    );
+  }
+
+  const isSuperAdminRoute = pathname.startsWith('/super-admin');
+  if (
+    !user
+    || (user.role === 'super_admin' && !isSuperAdminRoute)
+    || (user.role !== 'super_admin' && isSuperAdminRoute)
+  ) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        Mengarahkan ke halaman yang sesuai...
       </div>
     );
   }

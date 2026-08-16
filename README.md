@@ -130,9 +130,9 @@ Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment 
 
 ### Environment deployment VPS
 
-Workflow menggunakan file `/var/www/html/pos/.env` yang tersimpan langsung di VPS. File tersebut wajib berisi minimal `DATABASE_URL`, `SESSION_SECRET`, dan `FIELD_ENCRYPTION_KEY`. Next.js dan Prisma memuat `.env` secara otomatis saat build, migration, dan startup; nilainya tidak perlu disalin ke GitHub Actions secrets.
+Workflow menggunakan file `/var/www/html/pos/.env` yang tersimpan langsung di VPS. File tersebut wajib berisi koneksi database, secret sesi/enkripsi, slug tenant awal, serta kredensial Super Admin dan admin tenant. Next.js dan Prisma memuat `.env` secara otomatis saat build, migration, dan startup; nilainya tidak perlu disalin ke GitHub Actions secrets.
 
-File `.env` tetap diabaikan Git, tidak terhapus oleh `git pull` atau `npm ci`, dan sebaiknya dibatasi dengan permission `600`. Workflow memeriksa keberadaan file, memvalidasi format environment dengan `npm run env:check`, kemudian menjalankan production build, `prisma migrate deploy`, dan restart PM2.
+File `.env` tetap diabaikan Git, tidak terhapus oleh `git pull` atau `npm ci`, dan sebaiknya dibatasi dengan permission `600`. Workflow memeriksa keberadaan file, memvalidasi environment, menjalankan production build dan migration, menyinkronkan hash kredensial admin dari `.env`, lalu me-restart PM2.
 
 ---
 

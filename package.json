@@ -14,6 +14,7 @@
     "db:ensure": "node scripts/ensure-database.mjs --create",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:sync-admin-credentials": "node scripts/sync-admin-credentials.mjs",
     "db:verify": "node scripts/verify-database.mjs",
     "db:studio": "prisma studio",
     "migrate:supabase": "node scripts/migrate-supabase-to-postgres.mjs",
