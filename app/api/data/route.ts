@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { hash } from 'bcryptjs';
+import { hash } from 'bcrypt';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { toJsonSafe } from '@/lib/serialization';

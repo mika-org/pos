@@ -1,4 +1,5 @@
 import nextEnv from '@next/env';
+import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 import { lookup } from 'node:dns/promises';
 
@@ -132,6 +133,13 @@ async function persistAsset(tenantId, value, kind, isPublic) {
 }
 
 const bigint = (value, fallback = 0) => BigInt(value ?? fallback);
+const bcryptHashPattern = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
+async function normalizePassword(value) {
+  if (!value) return null;
+  const password = String(value);
+  return bcryptHashPattern.test(password) ? password : bcrypt.hash(password, 12);
+}
 
 async function importRows(tenantId, data) {
   const counts = {};
@@ -141,7 +149,7 @@ async function importRows(tenantId, data) {
     const existing = await prisma.user.findFirst({ where: { tenantId, email } });
     if (existing?.role === 'super_admin') continue;
     const values = {
-      tenantId, name: row.name || email, email, password: row.password || null,
+      tenantId, name: row.name || email, email, password: await normalizePassword(row.password),
       role: row.role === 'admin' ? 'admin' : 'kasir',
       createdAt: bigint(row.createdAt, Date.now()), updatedAt: bigint(row.updatedAt, Date.now()),
       deleted: Boolean(row.deleted),

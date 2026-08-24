@@ -1,5 +1,5 @@
 import nextEnv from '@next/env';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 
 nextEnv.loadEnvConfig(process.cwd());
