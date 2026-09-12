@@ -3,25 +3,28 @@
 import Link from 'next/link';
 import { 
   LayoutDashboard, ShoppingCart, Users, Package, FileText, Settings, 
-  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight 
+  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight, Building2
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/stores/languageStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const { t } = useTranslation();
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUiStore();
   const pathname = usePathname();
+  const router = useRouter();
   const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const [mounted, setMounted] = useState(false);
 
   // Avoid hydration mismatch
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const collapsed = mounted ? sidebarCollapsed : false;
@@ -31,6 +34,12 @@ export function Sidebar() {
     if (mobileOpen) {
       setSidebarMobileOpen(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+    router.refresh();
   };
 
   const isActive = (href: string) => {
@@ -115,6 +124,18 @@ export function Sidebar() {
 
         {/* Navigation Menu Links */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-none">
+          {isSuperAdmin ? (
+            <Link
+              href="/super-admin/tenants"
+              onClick={handleLinkClick}
+              className={getLinkClass('/super-admin/tenants')}
+              title="Kontrol Multi-Tenant"
+            >
+              <Building2 className={getIconClass('/super-admin/tenants', 'text-slate-400')} size={18} />
+              {!collapsed && <span className="text-xs font-semibold">Kontrol Multi-Tenant</span>}
+            </Link>
+          ) : (
+            <>
           
           {/* Dashboard */}
           <Link 
@@ -256,6 +277,8 @@ export function Sidebar() {
               </Link>
             </>
           )}
+            </>
+          )}
         </nav>
 
         {/* User Footer profile details */}
@@ -274,7 +297,7 @@ export function Sidebar() {
               )}
             </div>
             <button 
-              onClick={logout}
+              onClick={() => void handleLogout()}
               className={`p-1.5 rounded-lg text-slate-455 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer`}
               title={t('logout')}
             >

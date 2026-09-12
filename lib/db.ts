@@ -100,7 +100,7 @@ export interface CustomerOrder {
   customer_name: string;
   customer_email: string;
   total_amount: number;
-  payment_method: 'qris' | 'bank_transfer';
+  payment_method: 'qris' | 'bank_transfer' | 'cashier';
   payment_proof: string;
   status: 'pending_confirmation' | 'preparing' | 'delivery' | 'finished' | 'rejected';
   verified_by?: string | null;

@@ -17,6 +17,8 @@ export default function POSPage() {
   const [completedTransaction, setCompletedTransaction] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'Transfer'>('Tunai');
+  const [qrisCheckout, setQrisCheckout] = useState<{ loading: boolean; mode?: 'xendit' | 'static'; qrImage?: string; paymentRequestId?: string; status?: string; error?: string }>({ loading: false });
+  const qrisReferenceRef = useRef('');
   const [activeTab, setActiveTab] = useState<'menu' | 'cart'>('menu');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { settings } = useSettingsStore();
@@ -24,15 +26,43 @@ export default function POSPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Store actions
   const { cart, addToCart, removeFromCart, updateQty, getSubtotal, getTotal, clearCart } = usePOSStore();
 
   const finalTotal = getTotal() + (getTotal() * (settings.taxPercentage / 100));
 
+  useEffect(() => {
+    if (!isPaymentModalOpen || paymentMethod !== 'QRIS') return;
+    if (!qrisReferenceRef.current) qrisReferenceRef.current = `POS-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`;
+    let cancelled = false;
+    const createQris = async () => {
+      setQrisCheckout({ loading: true });
+      const response = await fetch('/api/payments/qris', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ referenceId: qrisReferenceRef.current, amount: Math.round(finalTotal) }),
+      });
+      const payload = await response.json();
+      if (cancelled) return;
+      if (!response.ok) setQrisCheckout({ loading: false, error: payload.error || 'QRIS tidak tersedia' });
+      else setQrisCheckout({ loading: false, mode: payload.mode, qrImage: payload.qrImage, paymentRequestId: payload.paymentRequestId, status: payload.status });
+    };
+    void createQris();
+    return () => { cancelled = true; };
+  }, [isPaymentModalOpen, paymentMethod, finalTotal]);
+
+  useEffect(() => {
+    if (qrisCheckout.mode !== 'xendit' || !qrisCheckout.paymentRequestId || qrisCheckout.status === 'SUCCEEDED') return;
+    const interval = setInterval(async () => {
+      const response = await fetch(`/api/payments/qris/${encodeURIComponent(qrisCheckout.paymentRequestId!)}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (payload.status) setQrisCheckout((current) => ({ ...current, status: payload.status }));
+      if (payload.paid) setAmountPaid(String(Math.round(finalTotal)));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [qrisCheckout.mode, qrisCheckout.paymentRequestId, qrisCheckout.status, finalTotal]);
+
   const fetchMasterData = async () => {
-    setIsLoading(true);
     try {
       const [categoriesRes, productsRes] = await Promise.all([
         supabase.from('categories').select('*').eq('deleted', false),
@@ -46,13 +76,12 @@ export default function POSPage() {
       setAllProducts(productsRes.data || []);
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMasterData();
+    const timer = window.setTimeout(() => void fetchMasterData(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Filter products based on search and category
@@ -120,7 +149,12 @@ export default function POSPage() {
     const taxAmount = subtotalWithDiscount * (settings.taxPercentage / 100);
     const finalTotal = subtotalWithDiscount + taxAmount;
     
-    const paid = Number(amountPaid);
+    const dynamicQris = paymentMethod === 'QRIS' && qrisCheckout.mode === 'xendit';
+    if (dynamicQris && qrisCheckout.status !== 'SUCCEEDED') {
+      alert('Pembayaran Xendit belum diterima.');
+      return;
+    }
+    const paid = dynamicQris ? finalTotal : Number(amountPaid);
     
     if (paid < finalTotal) {
       alert('Uang pembayaran kurang!');
@@ -146,9 +180,6 @@ export default function POSPage() {
         updatedAt: Date.now(),
       };
 
-      const { error: txError } = await supabase.from('transactions').insert(txData);
-      if (txError) throw txError;
-      
       const txItems: TransactionItem[] = [];
 
       // Save items
@@ -165,14 +196,19 @@ export default function POSPage() {
         });
       }
 
-      const { error: itemsError } = await supabase.from('transaction_items').insert(txItems);
-      if (itemsError) throw itemsError;
-      
-      // Deduct stock
-      for (const item of cart) {
-        const newStock = item.product.stock - item.qty;
-        await supabase.from('products').update({ stock: newStock, updatedAt: Date.now() }).eq('id', item.product.id);
-      }
+      const response = await fetch('/api/pos/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          hold: false,
+          transaction: txData,
+          items: txItems,
+          paymentReferenceId: paymentMethod === 'QRIS' ? qrisReferenceRef.current : undefined,
+          xenditPaymentRequestId: dynamicQris ? qrisCheckout.paymentRequestId : undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Checkout gagal');
 
       setIsPaymentModalOpen(false);
       clearCart();
@@ -211,9 +247,6 @@ export default function POSPage() {
         updatedAt: Date.now(),
       };
 
-      const { error: txError } = await supabase.from('transactions').insert(txData);
-      if (txError) throw txError;
-
       const txItems: TransactionItem[] = [];
       for (const item of cart) {
         txItems.push({
@@ -228,8 +261,13 @@ export default function POSPage() {
         });
       }
 
-      const { error: itemsError } = await supabase.from('transaction_items').insert(txItems);
-      if (itemsError) throw itemsError;
+      const response = await fetch('/api/pos/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hold: true, transaction: txData, items: txItems }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Gagal hold transaksi');
 
       clearCart();
       alert('Transaksi berhasil di-hold!');
@@ -475,6 +513,8 @@ export default function POSPage() {
               onClick={() => {
                 setPaymentMethod('Tunai');
                 setAmountPaid('');
+                setQrisCheckout({ loading: false });
+                qrisReferenceRef.current = '';
                 setIsPaymentModalOpen(true);
               }}
               disabled={cart.length === 0}
@@ -554,7 +594,9 @@ export default function POSPage() {
               {/* QRIS Display Block */}
               {paymentMethod === 'QRIS' && (
                 <div className="mb-6 flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  {settings.qrisImage ? (
+                  {qrisCheckout.loading ? (
+                    <div className="w-48 h-48 bg-white border rounded-xl flex items-center justify-center text-xs text-slate-500">Menyiapkan QRIS...</div>
+                  ) : qrisCheckout.qrImage ? (
                     <div className="flex flex-col items-center space-y-3">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                         <QrCode size={12} className="text-indigo-500" />
@@ -562,7 +604,7 @@ export default function POSPage() {
                       </span>
                       <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
                         <img 
-                          src={settings.qrisImage} 
+                          src={qrisCheckout.qrImage}
                           alt="QRIS QR Code" 
                           className="w-48 h-48 object-contain"
                         />
@@ -570,6 +612,8 @@ export default function POSPage() {
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-400">Total Pembayaran</p>
                         <p className="text-base font-bold text-slate-800">Rp {finalTotal.toLocaleString('id-ID')}</p>
+                        {qrisCheckout.mode === 'xendit' && <p className={`text-xs font-bold mt-1 ${qrisCheckout.status === 'SUCCEEDED' ? 'text-emerald-600' : 'text-amber-600'}`}>{qrisCheckout.status === 'SUCCEEDED' ? 'Pembayaran diterima' : 'Menunggu pembayaran Xendit'}</p>}
+                        {qrisCheckout.mode === 'static' && <p className="text-xs font-bold mt-1 text-amber-600">QRIS statis / konfirmasi manual</p>}
                       </div>
                     </div>
                   ) : (
@@ -577,9 +621,9 @@ export default function POSPage() {
                       <div className="mx-auto w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center border border-amber-200">
                         <Scan size={20} className="text-amber-500 animate-pulse" />
                       </div>
-                      <h3 className="text-xs font-bold text-slate-800">QRIS Belum Diunggah</h3>
+                      <h3 className="text-xs font-bold text-slate-800">QRIS Tidak Tersedia</h3>
                       <p className="text-[11px] text-slate-500 leading-normal">
-                        Unggah gambar QRIS di menu <strong>Pengaturan</strong> terlebih dahulu agar QR code dapat tampil di sini.
+                        {qrisCheckout.error || <>Unggah gambar QRIS di menu <strong>Pengaturan</strong> terlebih dahulu.</>}
                       </p>
                     </div>
                   )}
@@ -644,7 +688,7 @@ export default function POSPage() {
               <button 
                 type="button"
                 onClick={handleCheckout}
-                disabled={Number(amountPaid) < finalTotal}
+                disabled={(paymentMethod === 'QRIS' && qrisCheckout.mode === 'xendit') ? qrisCheckout.status !== 'SUCCEEDED' : Number(amountPaid) < finalTotal}
                 className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Selesaikan Pembayaran

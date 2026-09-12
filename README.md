@@ -1,14 +1,14 @@
 # ViorePos - Smart & Premium Point of Sale
 
-ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersinkronisasi langsung ke database **PostgreSQL murni** yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL (pg)**, **Zustand**, **Tailwind CSS v4**, dan **DOKU Payment Gateway**.
+ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, serta mendukung integrasi **DOKU Payment Gateway** dan **Xendit**.
 
 ---
 
 ## 🌟 Fitur Utama (Key Features)
 
-### 1. Sistem Autentikasi Modern (JWT & Session Sync)
+### 1. Sistem Autentikasi Server-side
 - Desain login premium dengan ambient mesh gradient & show/hide password toggle.
-- Flow otentikasi client-side menggunakan token **JWT** (`localStorage`) yang di-hash dengan `JWT_SECRET`.
+- Sesi ditandatangani server menggunakan JWT (`jose`) dan disimpan pada cookie `HttpOnly`, `SameSite=Lax`, dan `Secure` di production.
 - Proteksi route admin/cashier otomatis melalui `AuthProvider` (pengalihan otomatis jika belum login / sesi berakhir).
 
 ### 2. POS Kasir (Cashier POS)
@@ -17,13 +17,14 @@ ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersi
 - Kalkulasi otomatis untuk subtotal, diskon, pajak penjualan, total, nominal pembayaran, dan kembalian.
 - Simpan pesanan sementara (Hold) dan batalkan transaksi secara instan.
 
-### 3. Pemesanan Mandiri Customer (Self-Order Wizard) & DOKU Payment Gateway
+### 3. Pemesanan Mandiri Customer (Self-Order Wizard) & Payment Gateway
 - Halaman publik `/order` yang dioptimalkan untuk akses scan QR Code meja (tanpa memerlukan login kasir).
-- Pilihan pembayaran online terintegrasi langsung via **DOKU Jokul API** (QRIS Dinamis, Virtual Account, dsb.) dengan verifikasi status instan.
+- Pilihan pembayaran online terintegrasi via **DOKU Jokul API** (QRIS Dinamis, Virtual Account, dsb.) dengan Client ID `BRN-0232-1788668958800` dan verifikasi status instan.
+- Pilihan pembayaran via **Xendit Payments API v3** atau QRIS statis / transfer bank dengan unggah bukti pembayaran.
 - Notifikasi email riil otomatis ke customer via **SMTP Gmail**.
 
-### 4. Notifikasi Pesanan Masuk Real-time
-- Polling otomatis ke PostgreSQL untuk mendeteksi pesanan meja baru seketika.
+### 4. Notifikasi Pesanan Masuk
+- Polling API PostgreSQL tenant-scoped untuk mendeteksi pesanan meja baru secara real-time.
 - **Audio Chime**: Memainkan efek suara lonceng ("ding-dong") menggunakan Web Audio API.
 - **Visual Alert Toast**: Kartu notifikasi melayang (toast alert) berisi ID, nama pelanggan, lokasi meja, dan total pembayaran.
 - **Header Notification Center**: Lencana counter aktif yang membal pada ikon Bell.
@@ -47,9 +48,9 @@ ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersi
 - **Sidebar & Header**: Sidebar desktop yang dapat dilipat (collapsible).
 
 ### 8. Pengaturan & Laporan (Settings & Reports)
-- **Settings**: Konfigurasi profil toko, DOKU Payment Gateway, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen rekening bank.
-- **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi dengan ekspor CSV & Excel.
-- **Backup**: Pencadangan database langsung ke format file JSON secara instan.
+- **Settings**: Konfigurasi profil toko, DOKU Payment Gateway, Xendit API, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen banyak rekening bank transfer toko.
+- **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi (gabungan POS & order meja) dengan kolom sumber serta ekspor Excel (.xlsx) premium via ExcelJS.
+- **Backup**: Pencadangan database PostgreSQL tenant ke format file JSON secara instan.
 
 ---
 
@@ -75,63 +76,17 @@ DOKU_API_KEY=doku_key_ad4e81ce69f3459c815eae45ba7d8183
 DOKU_IS_PRODUCTION=true
 ```
 
-### 2. Perintah Migrasi Database PostgreSQL
-```bash
-npm run migrate       # Jalankan migrasi tertunda
-npm run migrate:dry   # Cek daftar migrasi tanpa mengeksekusi
-```
+### 2. Perintah Database
 
 | Perintah | Keterangan |
 |---|---|
-| `npm run migrate` | Terapkan semua migrasi yang belum dijalankan |
-| `npm run migrate:dry` | Lihat daftar file yang akan dijalankan tanpa mengubah database |
-| `npm run migrate:file 20260622000001` | Jalankan file migrasi tertentu saja |
-
-```bash
-# Preview apa yang akan dijalankan
-npm run migrate:dry
-
-# Terapkan semua migrasi
-npm run migrate
-```
-
-Migration runner secara otomatis:
-- ✅ Membaca semua `.sql` dari `supabase/migrations/` (urut berdasarkan nama file)
-- ✅ Melacak migrasi yang sudah diterapkan di tabel `migrations_log`
-- ✅ Melewati file yang sudah dijalankan sebelumnya (idempotent)
-- ✅ Memeriksa koneksi fallback dari `lib/supabase.ts` jika tidak ada `.env.local`
-
----
-
-### Cara B: Supabase CLI (npx supabase)
-
-Menggunakan official Supabase CLI untuk link dan push migrasi.
-
-#### 1. Hubungkan Project ke Supabase
-```bash
-npm run supabase:link
-```
-*Anda akan diminta untuk memasukkan **Project Reference ID** dan **Database Password** proyek Supabase Anda.*
-
-#### 2. Jalankan Migrasi (Push Migrations)
-```bash
-npm run supabase:push
-```
-*Terapkan semua file migrasi skema database lokal ke database remote Supabase.*
-
-#### 3. Cek Status Migrasi
-```bash
-npm run supabase:status
-```
-
----
-
-### File Migrasi yang Tersedia
-
-| File | Keterangan |
-|---|---|
-| `20260622000000_initial_schema.sql` | Skema lengkap: semua tabel, RLS, policy, dan data awal meja |
-| `20260622000001_orders_realtime.sql` | Aktifkan Supabase Realtime untuk `customer_orders` + seed data dummy produk & settings |
+| `npm run db:ensure` | Buat database dari nama di `DATABASE_URL` bila belum ada |
+| `npm run db:generate` | Generate Prisma Client |
+| `npm run db:migrate` | Terapkan migration Prisma yang belum dijalankan |
+| `npm run db:seed` | Seed tenant awal, Super Admin, admin tenant, kategori, produk, meja, dan settings |
+| `npm run db:verify` | Verifikasi migration, jumlah seed, dan hash kredensial pada database target |
+| `npm run migrate:supabase:dry` | Hitung row Supabase tanpa menulis PostgreSQL |
+| `npm run migrate:supabase` | Import seluruh tabel dan file Base64/Storage Supabase secara idempotent |
 
 ---
 
@@ -142,24 +97,25 @@ npm run supabase:status
 npm install
 ```
 
-### 2. Terapkan Migrasi Database
+### 2. Terapkan Database
 ```bash
-# Review dulu
-npm run migrate:dry
-
-# Lalu terapkan
-npm run migrate
+npm run db:ensure
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 ```
 
 ### 3. Jalankan Server Development
 ```bash
 npm run dev
+# atau menjalankan di port 3200
+npm run dev:3200
 ```
 
 Akses aplikasi di browser melalui:
-- Panel Kasir/Admin: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-  - *Akun Admin Bawaan:* `admin@store.com` / `admin123`
-- Halaman Order Meja: [http://localhost:3000/order?table=meja_01](http://localhost:3000/order?table=meja_01)
+- Panel Kasir/Admin: [http://localhost:3200/dashboard](http://localhost:3200/dashboard)
+- Super Admin: [http://localhost:3200/super-admin/tenants](http://localhost:3200/super-admin/tenants)
+- Halaman Order Meja: [http://localhost:3200/order?table=meja_01&tenant=restoflow](http://localhost:3200/order?table=meja_01&tenant=restoflow)
 
 ---
 
@@ -167,7 +123,8 @@ Akses aplikasi di browser melalui:
 
 ```
 pos/
-├── app/                    # Next.js App Router pages
+├── app/                    # Next.js App Router pages & API routes
+│   ├── api/                # Route Handlers (/api/data, /api/auth, /api/payments, etc.)
 │   ├── dashboard/          # Dasbor analitik utama
 │   ├── order/              # Halaman self-order publik (untuk pelanggan)
 │   ├── orders/             # Manajemen & verifikasi pesanan meja (admin)
@@ -175,12 +132,10 @@ pos/
 │   └── ...                 # pages lainnya
 ├── components/             # React components
 │   └── layout/             # Header, Sidebar, AuthProvider
-├── lib/                    # Utilities: db types, supabase client, jwt, translations
-├── scripts/
-│   └── migrate.js          # ✨ Migration runner otomatis
+├── lib/                    # Prisma, auth session, tenant context, storage, Xendit, translations
+├── prisma/                 # Schema, migration, dan seed PostgreSQL
+├── scripts/                # Utility scripts (ensure-database, sync-admin, etc.)
 ├── stores/                 # Zustand state stores
-├── supabase/
-│   └── migrations/         # File SQL migrasi database (urut timestamp)
 ├── .env.example            # Template variabel environment
 └── README.md
 ```

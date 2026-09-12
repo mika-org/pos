@@ -26,6 +26,9 @@ export interface StoreSettings {
   maxFileSize: number;
   bankAccounts: BankAccount[];
   doku: DokuSettings;
+  xenditEnabled: boolean;
+  xenditConfigured: boolean;
+  xenditEnvironment: 'development' | 'production';
 }
 
 interface SettingsState {
@@ -62,6 +65,9 @@ const initialStoreSettings: StoreSettings = {
   maxFileSize: 5,
   bankAccounts: defaultBankAccounts,
   doku: defaultDokuSettings,
+  xenditEnabled: false,
+  xenditConfigured: false,
+  xenditEnvironment: 'development',
 };
 
 // Safe localStorage loader helper
@@ -125,6 +131,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           maxFileSize: data.maxFileSize !== undefined && data.maxFileSize !== null ? Number(data.maxFileSize) : 5,
           bankAccounts: parsedBanks && parsedBanks.length > 0 ? parsedBanks : (get().settings.bankAccounts || defaultBankAccounts),
           doku: parsedDoku,
+          xenditEnabled: Boolean(data.xenditEnabled),
+          xenditConfigured: Boolean(data.xenditConfigured),
+          xenditEnvironment: data.xenditEnvironment === 'production' ? 'production' : 'development',
         };
 
         set({ settings: newSettings });
@@ -133,7 +142,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           localStorage.setItem('viorepos_settings', JSON.stringify(newSettings));
         }
       } else if (error && error.code === 'PGRST116') {
-        // Record doesn't exist on Supabase, insert the default one
+        // Record belum ada di PostgreSQL, buat nilai default untuk tenant ini.
         const currentSettings = get().settings;
         await supabase.from('settings').insert({
           id: 'default',
@@ -145,11 +154,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           maxFileSize: currentSettings.maxFileSize,
           bank_accounts: JSON.stringify(currentSettings.bankAccounts),
           doku_settings: JSON.stringify(currentSettings.doku),
+          xenditEnabled: currentSettings.xenditEnabled,
+          xenditConfigured: currentSettings.xenditConfigured,
+          xenditEnvironment: currentSettings.xenditEnvironment,
           updatedAt: Date.now()
         });
       }
     } catch (err) {
-      console.error('Failed to fetch settings from Supabase (using local cache):', err);
+      console.error('Failed to fetch settings from PostgreSQL:', err);
     } finally {
       set({ isLoading: false });
     }
@@ -184,13 +196,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           maxFileSize: updatedSettings.maxFileSize,
           bank_accounts: JSON.stringify(updatedSettings.bankAccounts),
           doku_settings: JSON.stringify(updatedSettings.doku),
+          xenditEnabled: updatedSettings.xenditEnabled,
+          xenditConfigured: updatedSettings.xenditConfigured,
+          xenditEnvironment: updatedSettings.xenditEnvironment,
           updatedAt: Date.now()
         });
       if (error) {
-        console.warn('Supabase sync notice:', error.message);
+        console.error('Failed to save settings to PostgreSQL:', error);
       }
     } catch (err) {
-      console.warn('Supabase offline or unreachable, local settings retained:', err);
+      console.error('Failed to save settings to PostgreSQL:', err);
     }
   }
 }));

@@ -14,16 +14,17 @@ import {
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { CustomerOrder } from '@/lib/db';
+import { useAuthStore } from '@/stores/authStore';
 
 export function Header() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const { t, language, setLanguage } = useTranslation();
   const { toggleSidebarMobile } = useUiStore();
   const router = useRouter();
   const [pendingOrders, setPendingOrders] = useState<CustomerOrder[]>([]);
+  const userRole = useAuthStore((state) => state.user?.role);
 
   useEffect(() => {
-    setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -36,10 +37,9 @@ export function Header() {
     };
   }, []);
 
-  // Fetch pending customer orders and poll regularly for new orders
   useEffect(() => {
+    if (!userRole || userRole === 'super_admin') return;
     let isMounted = true;
-
     const fetchPending = async () => {
       try {
         const { data, error } = await supabase
@@ -62,7 +62,7 @@ export function Header() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [userRole]);
 
   return (
     <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-6 transition-all duration-300">
