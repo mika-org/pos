@@ -12,12 +12,12 @@ const downloadFile = (data: any, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const exportSupabaseDb = async () => {
+export const exportPostgresDb = async () => {
   try {
     const data: Record<string, any> = {};
     
     // List all tables we want to backup
-    const tables = ['users', 'products', 'categories', 'customers', 'suppliers', 'transactions', 'transaction_items'];
+    const tables = ['users', 'products', 'categories', 'customers', 'suppliers', 'transactions', 'transaction_items', 'settings', 'tables', 'customer_orders'];
     
     for (const tableName of tables) {
       const { data: tableData, error } = await supabase.from(tableName).select('*');
@@ -28,11 +28,14 @@ export const exportSupabaseDb = async () => {
     }
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(data, `supabase_backup_${timestamp}.json`);
+    downloadFile(data, `postgres_pos_backup_${timestamp}.json`);
     
     return { success: true };
   } catch (error: any) {
-    console.error("Supabase backup failed:", error);
+    console.error("PostgreSQL backup failed:", error);
     return { success: false, error: error.message };
   }
 };
+
+// Backward-compatible alias
+export const exportSupabaseDb = exportPostgresDb;

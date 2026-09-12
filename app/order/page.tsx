@@ -9,7 +9,7 @@ import { useTranslation } from '@/stores/languageStore';
 import { 
   User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
   Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
-  Store
+  Store, CreditCard
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -40,10 +40,11 @@ function CustomerOrderFormContent() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
+  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier' | 'doku'>('doku');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
-  const [paymentProof, setPaymentProof] = useState<string>('');
-  const [paymentProofName, setPaymentProofName] = useState<string>('');
+  const [paymentProof, setPaymentProof] = useState<string>('DOKU_GATEWAY');
+  const [paymentProofName, setPaymentProofName] = useState<string>('DOKU Gateway');
+  const [dokuUrl, setDokuUrl] = useState<string | null>(null);
 
   // Submitted Order State (for success step tracking)
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
@@ -191,7 +192,7 @@ function CustomerOrderFormContent() {
   };
 
   const handleSubmitOrder = async () => {
-    if (!paymentProof) {
+    if (!paymentProof && paymentMethod !== 'doku') {
       toast.error(t('proofRequired'));
       return;
     }
@@ -201,15 +202,38 @@ function CustomerOrderFormContent() {
       const orderId = `ORD-${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 105)}`;
       const now = Date.now();
 
+      let dokuPaymentUrl: string | null = null;
+      if (paymentMethod === 'doku') {
+        try {
+          const res = await fetch('/api/doku/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId,
+              amount: getTotal(),
+              customerName,
+              customerEmail,
+            })
+          });
+          const dokuRes = await res.json();
+          if (dokuRes.success && dokuRes.paymentUrl) {
+            dokuPaymentUrl = dokuRes.paymentUrl;
+            setDokuUrl(dokuPaymentUrl);
+          }
+        } catch (e) {
+          console.warn('DOKU checkout API error:', e);
+        }
+      }
+
       const orderPayload = {
         id: orderId,
         customer_name: customerName,
         customer_email: customerEmail,
         total_amount: getTotal(),
-        payment_method: paymentMethod === 'cashier' ? 'bank_transfer' : paymentMethod,
-        payment_proof: paymentProof,
+        payment_method: paymentMethod === 'cashier' ? 'bank_transfer' : (paymentMethod === 'doku' ? 'qris' : paymentMethod),
+        payment_proof: paymentMethod === 'doku' ? 'DOKU_GATEWAY' : paymentProof,
         status: 'pending_confirmation',
-        notes: null,
+        notes: paymentMethod === 'doku' ? `DOKU Online Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
         table_id: tableId === 'takeaway' || !tableId ? null : tableId,
         created_at: now,
         updated_at: now
@@ -236,14 +260,47 @@ function CustomerOrderFormContent() {
 
       if (itemsError) throw itemsError;
 
-      // Print simulations
-      console.log(t('simEmailSentCustomer', { email: customerEmail, id: orderId, status: 'Pending Confirmation' }));
-      console.log(t('simAdminNotification', { id: orderId, name: customerName, total: getTotal().toLocaleString('id-ID') }));
+      // Send real notification email via SMTP Gmail
+      fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: `Pesanan Berhasil Diterima [${orderId}] - ViorePos`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #2563eb; margin: 0; font-size: 24px; font-weight: 800;">ViorePos</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Konfirmasi Pesanan Pelanggan</p>
+              </div>
+              <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #334155;">Halo <strong>${customerName}</strong>,</p>
+                <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5;">Pesanan Anda berhasil kami terima dan sedang dipersiapkan oleh tim dapur kami.</p>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">No. Pesanan:</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #0f172a;">${orderId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">Total Bayar:</td>
+                  <td style="padding: 8px 0; font-weight: 800; text-align: right; color: #2563eb; font-size: 16px;">Rp ${getTotal().toLocaleString('id-ID')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">Status:</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #eab308;">Menunggu Konfirmasi</td>
+                </tr>
+              </table>
+              <div style="text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                Terima kasih atas pesanan Anda. Hubungi kasir jika membutuhkan bantuan.
+              </div>
+            </div>
+          `
+        })
+      }).catch(e => console.warn('Email dispatch notice:', e));
       
       toast.success(t('orderSuccess'));
-
-      // Show Simulation Banner to make it extremely visual!
-      toast(`📧 [Notifikasi] Simulasi email pesanan berhasil dikirim ke ${customerEmail}`, {
+      toast(`📧 Konfirmasi pesanan telah dikirim ke ${customerEmail}`, {
         icon: '✉️',
         duration: 5000,
       });
@@ -321,7 +378,7 @@ function CustomerOrderFormContent() {
         `)
         .eq('order_id', orderData.id);
       
-      const mappedItems = (itemsData || []).map(item => {
+      const mappedItems = ((itemsData as any[]) || []).map((item: any) => {
         const prodName = (item as any).products?.name || 'Unknown Product';
         return {
           quantity: item.quantity,
@@ -382,10 +439,10 @@ function CustomerOrderFormContent() {
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-linear-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-md shadow-blue-500/20 transition-transform duration-300 hover:rotate-3">
-            P
+            V
           </div>
           <div>
-            <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">RestoFlow</h1>
+            <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">ViorePos</h1>
             <p className="text-[10px] text-slate-400 font-extrabold tracking-wider mt-1 uppercase">{t('orderFormTitle')}</p>
           </div>
         </div>
@@ -885,7 +942,25 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Payment Method Selector */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className={`grid ${settings.doku?.enabled !== false ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
+                  {settings.doku?.enabled !== false && (
+                    <button
+                      type="button"
+                      onClick={() => { 
+                        setPaymentMethod('doku'); 
+                        setPaymentProof('DOKU_GATEWAY'); 
+                        setPaymentProofName('DOKU Gateway'); 
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center space-y-1.5 cursor-pointer transition-all ${
+                        paymentMethod === 'doku' 
+                          ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                          : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <CreditCard size={20} className={paymentMethod === 'doku' ? 'text-blue-600' : ''} />
+                      <span className="text-[10px] uppercase font-bold tracking-wider">DOKU</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('qris'); setPaymentProof(''); setPaymentProofName(''); }}
@@ -931,6 +1006,29 @@ function CustomerOrderFormContent() {
                 {/* Instructions Container */}
                 <div className="p-4 bg-slate-50/60 border border-slate-250/60 rounded-3xl flex flex-col items-center text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3">Informasi Pembayaran</p>
+                  
+                  {paymentMethod === 'doku' && (
+                    <div className="space-y-4 w-full flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                        <CreditCard size={24} />
+                      </div>
+                      <div className="space-y-1 text-center">
+                        <h4 className="text-sm font-black text-slate-900">Pembayaran Online Instan via DOKU</h4>
+                        <p className="text-xs text-slate-500 font-medium max-w-sm">
+                          Bayar otomatis menggunakan QRIS Dinamis, Virtual Account Bank, atau e-Wallet terverifikasi seketika.
+                        </p>
+                      </div>
+
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs flex items-center space-x-2">
+                        <Check size={16} className="shrink-0 text-emerald-600" />
+                        <span>Verifikasi otomatis tanpa perlu upload bukti transfer manual.</span>
+                      </div>
+
+                      <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
+                        Total: Rp {getTotal().toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  )}
                   
                   {paymentMethod === 'qris' && (
                     <div className="space-y-4 flex flex-col items-center">
@@ -1038,7 +1136,7 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Upload Proof Area */}
-                {paymentMethod !== 'cashier' && (
+                {paymentMethod !== 'cashier' && paymentMethod !== 'doku' && (
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
                     

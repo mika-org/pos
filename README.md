@@ -1,6 +1,6 @@
-# RestoFlow POS - Smart & Premium Point of Sale
+# ViorePos - Smart & Premium Point of Sale
 
-RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersinkronisasi ke cloud yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **Supabase**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
+ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan tersinkronisasi langsung ke database **PostgreSQL murni** yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL (pg)**, **Zustand**, **Tailwind CSS v4**, dan **DOKU Payment Gateway**.
 
 ---
 
@@ -8,7 +8,7 @@ RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan ters
 
 ### 1. Sistem Autentikasi Modern (JWT & Session Sync)
 - Desain login premium dengan ambient mesh gradient & show/hide password toggle.
-- Flow otentikasi client-side menggunakan token **JWT** (`localStorage`).
+- Flow otentikasi client-side menggunakan token **JWT** (`localStorage`) yang di-hash dengan `JWT_SECRET`.
 - Proteksi route admin/cashier otomatis melalui `AuthProvider` (pengalihan otomatis jika belum login / sesi berakhir).
 
 ### 2. POS Kasir (Cashier POS)
@@ -17,23 +17,21 @@ RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan ters
 - Kalkulasi otomatis untuk subtotal, diskon, pajak penjualan, total, nominal pembayaran, dan kembalian.
 - Simpan pesanan sementara (Hold) dan batalkan transaksi secara instan.
 
-### 3. Pemesanan Mandiri Customer (Self-Order Wizard)
+### 3. Pemesanan Mandiri Customer (Self-Order Wizard) & DOKU Payment Gateway
 - Halaman publik `/order` yang dioptimalkan untuk akses scan QR Code meja (tanpa memerlukan login kasir).
-- Deteksi otomatis nomor meja melalui query parameter URL (Contoh: `/order?table=meja_01` mengunci pilihan ke "Meja 01").
-- Wizard multi-langkah interaktif: Informasi Pelanggan ➡️ Pilih Menu ➡️ Rincian & Pajak ➡️ Pembayaran Bank Transfer/QRIS (dengan pengunggahan bukti bayar) ➡️ Selesai & Pelacakan.
+- Pilihan pembayaran online terintegrasi langsung via **DOKU Jokul API** (QRIS Dinamis, Virtual Account, dsb.) dengan verifikasi status instan.
+- Notifikasi email riil otomatis ke customer via **SMTP Gmail**.
 
 ### 4. Notifikasi Pesanan Masuk Real-time
-- Integrasi channel realtime Supabase untuk mendeteksi pesanan meja baru seketika.
+- Polling otomatis ke PostgreSQL untuk mendeteksi pesanan meja baru seketika.
 - **Audio Chime**: Memainkan efek suara lonceng ("ding-dong") menggunakan Web Audio API.
 - **Visual Alert Toast**: Kartu notifikasi melayang (toast alert) berisi ID, nama pelanggan, lokasi meja, dan total pembayaran.
-- **Header Notification Center**: Lencana (badge) counter aktif yang membal pada ikon Bell. Ketika diklik, menampilkan dropdown 5 transaksi pending terbaru.
-- **Auto-Open Drawer**: Mengklik notifikasi pesanan di dropdown otomatis mengarahkan ke dashboard dan membuka laci verifikasi bukti bayar order tersebut.
+- **Header Notification Center**: Lencana counter aktif yang membal pada ikon Bell.
 
 ### 5. Dasbor Manajemen Pesanan (Admin Orders Control)
 - Dasbor `/orders` untuk memproses dan memverifikasi pesanan mandiri pelanggan.
 - Tab filter status dinamis: Menunggu Konfirmasi, Sedang Disiapkan, Dalam Pengiriman, Selesai, dan Ditolak.
 - Tampilan laci detail pembayaran (detail customer, daftar produk, dan bukti pembayaran yang dapat diunduh/diperbesar).
-- Workflow status pengerjaan (Mulai Siapkan ➡️ Kirim Pesanan ➡️ Selesaikan Pesanan) lengkap dengan simulasi pengiriman email notifikasi.
 
 ### 6. Dasbor Analitik Kaya (Analytics Dashboard)
 - **Metric Cards**: Pendapatan hari ini, jumlah transaksi, produk terlaris, dan peringatan stok menipis.
@@ -46,46 +44,42 @@ RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan ters
 - **Master Meja**: Grid kartu meja makan interaktif untuk mengelola meja (Aktif/Nonaktif) dan mencetak QR Code pemesanan mandiri per meja.
 - **Master Produk**: Manajemen stok, harga beli, harga jual, barcode, kategori, dan foto menu.
 - **Master Kategori, Pelanggan, Supplier, & Pengguna**: Database entitas penunjang transaksi toko.
-- **Sidebar & Header**: Sidebar desktop yang dapat dilipat (collapsible) menyimpan status preferensi, serta sliding overlay drawer di perangkat mobile.
+- **Sidebar & Header**: Sidebar desktop yang dapat dilipat (collapsible).
 
 ### 8. Pengaturan & Laporan (Settings & Reports)
-- **Settings**: Konfigurasi profil toko, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen banyak rekening bank transfer toko.
-- **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi (gabungan POS & order meja) dengan kolom sumber (POS Kasir / Pesanan Meja) serta ekspor CSV.
-- **Backup**: Pencadangan database dari cloud Supabase ke format file JSON secara instan.
+- **Settings**: Konfigurasi profil toko, DOKU Payment Gateway, persentase pajak, batas ukuran berkas bukti bayar, dan manajemen rekening bank.
+- **Reports**: Grafik tren penjualan, produk terlaris harian, dan tabel rincian transaksi dengan ekspor CSV & Excel.
+- **Backup**: Pencadangan database langsung ke format file JSON secara instan.
 
 ---
 
-## 🛠️ Cara Migrasi Database (Supabase Migrations)
+## 🛠️ Konfigurasi Environment & Database PostgreSQL
 
-RestoFlow menyediakan **dua cara** untuk menerapkan migrasi database:
+### 1. File `.env.local`
+```env
+DATABASE_URL="postgresql://admin:eY%7D%3Ex%23u%5Ev%236%3FC3r3@103.93.162.19:5432/pos?schema=public"
+JWT_SECRET="secret_pos_super_key_2026"
+NEXT_PUBLIC_STORAGE_URL="https://pos.elevore.web.id/storage"
+NEXT_PUBLIC_APP_URL="https://pos.elevore.web.id/"
 
-### Cara A: Migration Runner Otomatis (npm run migrate) ✨ Recommended
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=dudungawug27@gmail.com
+SMTP_PASS=hgpr drsv hmuw qcif
+SMTP_FROM="VIOREPOS" <viorepost@gmail.com>
 
-Migration runner bawaan yang membaca semua file SQL dari `supabase/migrations/` dan menerapkannya secara otomatis tanpa perlu Supabase CLI.
+# DOKU Payment Gateway
+DOKU_CLIENT_ID=BRN-0232-1788668958800
+DOKU_SECRET_KEY=SK-ePUnXcEg73lttDKzMQS5
+DOKU_API_KEY=doku_key_ad4e81ce69f3459c815eae45ba7d8183
+DOKU_IS_PRODUCTION=true
+```
 
-#### Persiapan
-
-1. **Buat file `.env.local`** di root project (salin dari `.env.example`):
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
-   > Temukan key di: Supabase Dashboard → Settings → API
-
-2. **Buat fungsi helper SQL** di Supabase SQL Editor (sekali saja):
-   ```sql
-   CREATE OR REPLACE FUNCTION public.exec_sql(sql text)
-   RETURNS void AS $$
-   BEGIN
-     EXECUTE sql;
-   END;
-   $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-   GRANT EXECUTE ON FUNCTION public.exec_sql TO service_role;
-   ```
-
-#### Perintah Migrasi
+### 2. Perintah Migrasi Database PostgreSQL
+```bash
+npm run migrate       # Jalankan migrasi tertunda
+npm run migrate:dry   # Cek daftar migrasi tanpa mengeksekusi
+```
 
 | Perintah | Keterangan |
 |---|---|

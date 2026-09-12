@@ -90,7 +90,7 @@ export default function ReportsPage() {
       : `${format(new Date(startDate), 'dd MMMM yyyy')} - ${format(new Date(endDate), 'dd MMMM yyyy')}`;
 
     const data: any[][] = [
-      ['LAPORAN PENJUALAN - RESTOFLOW POS'],
+      ['LAPORAN PENJUALAN - VIOREPOS'],
       ['Periode:', reportDateStr],
       ['Tanggal Ekspor:', format(new Date(), 'dd MMMM yyyy HH:mm:ss')],
       [],

@@ -3,7 +3,7 @@ export type Locale = 'id' | 'en';
 export const translations = {
   id: {
     // General / Layout / Sidebar
-    appName: "RestoFlow",
+    appName: "ViorePos",
     language: "Bahasa",
     dashboard: "Dashboard",
     pos: "Kasir (POS)",
@@ -164,7 +164,7 @@ export const translations = {
   },
   en: {
     // General / Layout / Sidebar
-    appName: "RestoFlow",
+    appName: "ViorePos",
     language: "Language",
     dashboard: "Dashboard",
     pos: "Cashier (POS)",

@@ -62,18 +62,22 @@ VALUES
   ('meja_08', 'Meja 08', 'active', 1718985600000, 1718985600000)
 ON CONFLICT (id) DO NOTHING;
 
+-- Ensure doku_settings column exists
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS doku_settings TEXT;
+
 -- ============================================================
 -- 5. Seed default settings row (IF NOT EXISTS)
 -- ============================================================
-INSERT INTO public.settings (id, "storeName", "storeAddress", "storePhone", "taxPercentage", "updatedAt", "maxFileSize", bank_accounts)
+INSERT INTO public.settings (id, "storeName", "storeAddress", "storePhone", "taxPercentage", "updatedAt", "maxFileSize", bank_accounts, doku_settings)
 VALUES (
   'default',
-  'RestoFlow POS',
+  'ViorePos',
   'Jl. Merdeka No. 1, Jakarta Pusat',
   '021-5550123',
   11,
   1718985600000,
   5,
-  '[{"bankName":"BCA","accountNumber":"1234567890","accountName":"RestoFlow Store"},{"bankName":"Mandiri","accountNumber":"0987654321","accountName":"RestoFlow Store"}]'
+  '[{"bankName":"BCA","accountNumber":"1234567890","accountName":"ViorePos Store"},{"bankName":"Mandiri","accountNumber":"0987654321","accountName":"ViorePos Store"}]',
+  '{"enabled":true,"clientId":"BRN-0232-1788668958800","secretKey":"SK-ePUnXcEg73lttDKzMQS5","apiKey":"doku_key_ad4e81ce69f3459c815eae45ba7d8183","isProduction":false}'
 )
 ON CONFLICT (id) DO NOTHING;

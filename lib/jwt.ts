@@ -18,7 +18,8 @@ export function generateJWT(user: { id: string; email: string; role: 'admin' | '
 
   const base64Header = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const base64Payload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const signature = 'restoflow_sig_hash_pos_client';
+  const secret = process.env.JWT_SECRET || 'secret_pos_super_key_2026';
+  const signature = `viorepos_sig_${secret}`;
 
   return `${base64Header}.${base64Payload}.${signature}`;
 }

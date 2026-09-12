@@ -36,8 +36,10 @@ export function Header() {
     };
   }, []);
 
-  // Fetch pending customer orders and subscribe to realtime updates
+  // Fetch pending customer orders and poll regularly for new orders
   useEffect(() => {
+    let isMounted = true;
+
     const fetchPending = async () => {
       try {
         const { data, error } = await supabase
@@ -45,7 +47,7 @@ export function Header() {
           .select('*')
           .eq('status', 'pending_confirmation')
           .order('created_at', { ascending: false });
-        if (!error && data) {
+        if (!error && data && isMounted) {
           setPendingOrders(data);
         }
       } catch (err) {
@@ -54,34 +56,11 @@ export function Header() {
     };
 
     fetchPending();
-
-    const channel = supabase
-      .channel('header-incoming-orders')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'customer_orders' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newOrder = payload.new as CustomerOrder;
-            if (newOrder.status === 'pending_confirmation') {
-              setPendingOrders(prev => [newOrder, ...prev]);
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedOrder = payload.new as CustomerOrder;
-            if (updatedOrder.status !== 'pending_confirmation') {
-              setPendingOrders(prev => prev.filter(o => o.id !== updatedOrder.id));
-            } else {
-              setPendingOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setPendingOrders(prev => prev.filter(o => o.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
+    const interval = setInterval(fetchPending, 4000);
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 

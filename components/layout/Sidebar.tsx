@@ -92,7 +92,7 @@ export function Sidebar() {
                 </defs>
               </svg>
               <h1 className="text-base font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 tracking-wider">
-                RestoFlow
+                ViorePos
               </h1>
             </div>
           ) : (
