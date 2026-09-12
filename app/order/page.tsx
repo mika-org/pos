@@ -10,7 +10,7 @@ import { useTranslation } from '@/stores/languageStore';
 import { 
   User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
   Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
-  Store, CreditCard, Banknote, ExternalLink
+  Store, CreditCard, Banknote, ExternalLink, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -46,6 +46,10 @@ function CustomerOrderFormContent() {
   const [paymentProof, setPaymentProof] = useState<string>('DOKU_QRIS');
   const [paymentProofName, setPaymentProofName] = useState<string>('QRIS DOKU');
   const [dokuUrl, setDokuUrl] = useState<string | null>(null);
+  const [dokuQrImage, setDokuQrImage] = useState<string | null>(null);
+  const [dokuLoading, setDokuLoading] = useState<boolean>(false);
+  const [dokuError, setDokuError] = useState<string | null>(null);
+  const [dokuPaid, setDokuPaid] = useState<boolean>(false);
   const [draftOrderId] = useState(() => `ORD-${Date.now().toString().slice(-7)}-${crypto.randomUUID().slice(0, 6)}`);
   const [qrisPayment, setQrisPayment] = useState<{
     loading: boolean;
@@ -233,6 +237,74 @@ function CustomerOrderFormContent() {
     return () => { cancelled = true; };
   }, [step, paymentMethod, draftOrderId, tenantSlug, qrisAmount]);
 
+  // Generate DOKU QRIS dynamic payment when customer enters Step 4
+  useEffect(() => {
+    if (step !== 4 || paymentMethod !== 'doku') return;
+    let cancelled = false;
+
+    const generateDokuQr = async () => {
+      if (dokuQrImage && dokuUrl) return;
+      setDokuLoading(true);
+      setDokuError(null);
+      try {
+        const res = await fetch('/api/doku/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: draftOrderId,
+            amount: getTotal(),
+            customerName: customerName || 'Pelanggan',
+            customerEmail: customerEmail || 'customer@viorepos.com',
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.success && data.paymentUrl) {
+          setDokuUrl(data.paymentUrl);
+          setDokuQrImage(data.qrImage || null);
+          setPaymentProof('DOKU_QRIS');
+        } else {
+          setDokuError(data.error || 'Gagal memuat QRIS DOKU');
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setDokuError(err?.message || 'Koneksi ke DOKU gagal');
+        }
+      } finally {
+        if (!cancelled) setDokuLoading(false);
+      }
+    };
+
+    void generateDokuQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, paymentMethod, draftOrderId, customerName, customerEmail, dokuQrImage, dokuUrl]);
+
+  // Poll DOKU Payment Status automatically
+  useEffect(() => {
+    if (paymentMethod !== 'doku' || !draftOrderId || dokuPaid) return;
+    if (step !== 4 && step !== 5) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/doku/status/${encodeURIComponent(draftOrderId)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success && data.paid) {
+          setDokuPaid(true);
+          toast.success('Pembayaran QRIS DOKU berhasil diverifikasi!');
+          if (step === 5 && submittedOrder) {
+            setSubmittedOrder((prev) => prev ? { ...prev, status: 'preparing' } : prev);
+          }
+        }
+      } catch {
+        // silent polling
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [paymentMethod, draftOrderId, dokuPaid, step, submittedOrder]);
+
   useEffect(() => {
     if (qrisPayment.mode !== 'xendit' || !qrisPayment.paymentRequestId || qrisPayment.status === 'SUCCEEDED') return;
     const interval = setInterval(async () => {
@@ -296,8 +368,8 @@ function CustomerOrderFormContent() {
       const orderId = draftOrderId;
       const now = Date.now();
 
-      let dokuPaymentUrl: string | null = null;
-      if (paymentMethod === 'doku') {
+      let dokuPaymentUrl: string | null = dokuUrl;
+      if (paymentMethod === 'doku' && !dokuPaymentUrl) {
         try {
           const res = await fetch('/api/doku/checkout', {
             method: 'POST',
@@ -313,6 +385,7 @@ function CustomerOrderFormContent() {
           if (dokuRes.success && dokuRes.paymentUrl) {
             dokuPaymentUrl = dokuRes.paymentUrl;
             setDokuUrl(dokuPaymentUrl);
+            if (dokuRes.qrImage) setDokuQrImage(dokuRes.qrImage);
           }
         } catch (e) {
           console.warn('DOKU checkout API error:', e);
@@ -403,12 +476,9 @@ function CustomerOrderFormContent() {
       setSubmittedOrder(orderPayload);
       setStep(5);
 
-      // If DOKU URL was generated, prompt redirect to QRIS payment page
+      // If DOKU URL was generated, show success feedback
       if (dokuPaymentUrl) {
-        toast.loading('Membuka halaman pembayaran QRIS DOKU...', { duration: 2500 });
-        setTimeout(() => {
-          window.location.href = dokuPaymentUrl!;
-        }, 1200);
+        toast.success('Kode QRIS DOKU siap dipindai.');
       }
     } catch (err) {
       console.error('Failed to submit order:', err);
@@ -1101,24 +1171,87 @@ function CustomerOrderFormContent() {
 
                   {paymentMethod === 'doku' && (
                     <div className="space-y-4 w-full flex flex-col items-center">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                        <QrCode size={24} />
-                      </div>
                       <div className="space-y-1 text-center">
-                        <h4 className="text-sm font-black text-slate-900">QRIS Dinamis via DOKU Payment Gateway</h4>
+                        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-[11px] font-extrabold uppercase tracking-wider mb-1">
+                          <QrCode size={14} />
+                          <span>QRIS Dinamis (DOKU)</span>
+                        </div>
+                        <h4 className="text-base font-black text-slate-900">Pindai Kode QRIS untuk Membayar</h4>
                         <p className="text-xs text-slate-500 font-medium max-w-sm">
-                          Bayar praktis dengan scan kode QRIS menggunakan GoPay, OVO, Dana, ShopeePay, BCA Mobile, atau aplikasi bank mana pun.
+                          Gunakan GoPay, OVO, Dana, ShopeePay, BCA Mobile, Livin, atau aplikasi m-Banking mana pun.
                         </p>
                       </div>
 
-                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs flex items-center space-x-2">
-                        <Check size={16} className="shrink-0 text-emerald-600" />
-                        <span>Verifikasi pembayaran otomatis tanpa perlu upload bukti foto transfer.</span>
+                      {/* QR Code Container */}
+                      <div className="p-4 bg-white rounded-3xl border border-slate-200 shadow-md flex flex-col items-center justify-center transition-transform duration-300 hover:scale-[1.02]">
+                        {dokuLoading ? (
+                          <div className="w-56 h-56 flex flex-col items-center justify-center space-y-3 text-slate-400">
+                            <RefreshCw size={28} className="animate-spin text-blue-600" />
+                            <span className="text-xs font-bold">Membuat Kode QRIS DOKU...</span>
+                          </div>
+                        ) : dokuQrImage ? (
+                          <div className="space-y-3 flex flex-col items-center">
+                            <img
+                              src={dokuQrImage}
+                              alt="QRIS DOKU"
+                              className="w-56 h-56 object-contain rounded-xl"
+                            />
+                            <div className="flex items-center space-x-2 text-[11px] font-bold text-slate-500">
+                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span>Pindai langsung dari kamera / e-wallet</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-56 h-56 flex flex-col items-center justify-center p-4 text-center text-xs text-rose-600 space-y-2">
+                            <AlertCircle size={24} />
+                            <p className="font-bold">{dokuError || 'Gagal memuat QRIS'}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDokuQrImage(null);
+                                setDokuUrl(null);
+                              }}
+                              className="text-[11px] text-blue-600 underline font-bold cursor-pointer"
+                            >
+                              Coba lagi
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
-                        Total: Rp {getTotal().toLocaleString('id-ID')}
+                      {/* Total Amount Tag */}
+                      <div className="bg-blue-50 px-5 py-2.5 border border-blue-200 rounded-2xl text-blue-900 font-black text-base flex items-center space-x-2">
+                        <span className="text-xs font-semibold text-blue-600">Total:</span>
+                        <span>Rp {getTotal().toLocaleString('id-ID')}</span>
                       </div>
+
+                      {/* Status indicator */}
+                      <div className="flex items-center space-x-2">
+                        {dokuPaid ? (
+                          <div className="px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold flex items-center space-x-1.5">
+                            <Check size={14} className="text-emerald-600" />
+                            <span>Pembayaran QRIS Berhasil Diterima!</span>
+                          </div>
+                        ) : (
+                          <div className="px-3.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold flex items-center space-x-1.5 animate-pulse">
+                            <RefreshCw size={12} className="animate-spin text-amber-600" />
+                            <span>Menunggu scan & pembayaran pelanggan...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* External Link for Mobile Users */}
+                      {dokuUrl && (
+                        <a
+                          href={dokuUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-2 text-xs font-extrabold text-blue-600 hover:text-blue-700 hover:underline pt-1 cursor-pointer"
+                        >
+                          <span>Buka di Halaman Pembayaran DOKU</span>
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
                     </div>
                   )}
                   {paymentMethod === 'qris' && (
@@ -1333,22 +1466,34 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* DOKU QRIS Payment action if pending */}
-                {dokuUrl && submittedOrder.status === 'pending_confirmation' && (
-                  <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-4 rounded-2xl text-center space-y-2.5 max-w-xs mx-auto shadow-sm">
+                {(dokuQrImage || dokuUrl) && submittedOrder.status === 'pending_confirmation' && (
+                  <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-5 rounded-3xl text-center space-y-3 max-w-sm mx-auto shadow-sm">
                     <div className="flex items-center justify-center space-x-1.5 text-blue-700 font-extrabold text-xs">
-                      <QrCode size={16} />
-                      <span>Pembayaran QRIS DOKU</span>
+                      <QrCode size={18} />
+                      <span>Kode QRIS Pembayaran DOKU</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-snug">Klik tombol di bawah jika halaman pembayaran belum terbuka otomatis:</p>
-                    <a
-                      href={dokuUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                    >
-                      <span>Buka Kode QRIS</span>
-                      <ExternalLink size={14} />
-                    </a>
+
+                    {dokuQrImage && (
+                      <div className="p-3 bg-white rounded-2xl border border-slate-200 inline-block shadow-sm">
+                        <img src={dokuQrImage} alt="QRIS DOKU" className="w-44 h-44 object-contain mx-auto" />
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Pindai kode QR di atas atau klik tombol di bawah untuk membuka halaman pembayaran resmi DOKU:
+                    </p>
+
+                    {dokuUrl && (
+                      <a
+                        href={dokuUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                      >
+                        <span>Buka Halaman DOKU</span>
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
                   </div>
                 )}
 
