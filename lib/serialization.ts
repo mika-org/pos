@@ -8,6 +8,10 @@ export function toJsonSafe<T>(value: T): T {
     return undefined as T;
   }
 
+  if (value instanceof Date) {
+    return value.toISOString() as unknown as T;
+  }
+
   if (Array.isArray(value)) {
     return value.map(toJsonSafe) as T;
   }

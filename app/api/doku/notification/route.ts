@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
           .from('customer_orders')
           .update({
             status: 'preparing', // Automatically verified and moved to preparing
-            verified_at: Date.now(),
-            notes: `DOKU Payment Confirmed (${clientId})`,
-            updated_at: Date.now()
+            verified_at: new Date(),
+            notes: `DOKU QRIS Payment Confirmed (${clientId})`,
+            updated_at: new Date()
           })
           .eq('id', orderId);
       } catch (dbErr) {

@@ -459,8 +459,8 @@ function AdminOrdersPageContent() {
                     </td>
                     <td className="p-4 font-black text-slate-800 text-sm">Rp {order.total_amount.toLocaleString('id-ID')}</td>
                     <td className="p-4 uppercase text-xs font-extrabold text-slate-500">
-                      {order.payment_proof === 'DOKU_GATEWAY' ? (
-                        <span className="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-black text-[10px]">DOKU Gateway</span>
+                      {(order.payment_proof === 'DOKU_GATEWAY' || order.payment_proof === 'DOKU_QRIS') ? (
+                        <span className="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-black text-[10px]">QRIS DOKU</span>
                       ) : (order.payment_method === 'cashier' || order.payment_proof === 'CASHIER') ? (
                         'Bayar di Kasir'
                       ) : order.payment_method === 'qris' ? (
@@ -619,9 +619,9 @@ function AdminOrdersPageContent() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center pl-1">
                   <h3 className="text-xs text-slate-500 font-black uppercase tracking-wider">
-                    {selectedOrder.payment_proof === 'DOKU_GATEWAY' ? 'Pembayaran DOKU Gateway' : ((selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Metode Pembayaran' : t('paymentProofPreview'))}
+                    {(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? 'Pembayaran QRIS DOKU' : ((selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Metode Pembayaran' : t('paymentProofPreview'))}
                   </h3>
-                  {selectedOrder.payment_method !== 'cashier' && selectedOrder.payment_proof !== 'CASHIER' && selectedOrder.payment_proof !== 'DOKU_GATEWAY' && (
+                  {selectedOrder.payment_method !== 'cashier' && selectedOrder.payment_proof !== 'CASHIER' && selectedOrder.payment_proof !== 'DOKU_GATEWAY' && selectedOrder.payment_proof !== 'DOKU_QRIS' && (
                     <button 
                       onClick={() => handleDownloadProof(selectedOrder)}
                       className="text-xs text-blue-600 font-bold hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
@@ -632,18 +632,18 @@ function AdminOrdersPageContent() {
                   )}
                 </div>
 
-                {selectedOrder.payment_proof === 'DOKU_GATEWAY' ? (
+                {(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? (
                   <div className="p-5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3 shadow-sm text-left">
                     <div className="flex items-center space-x-2.5 text-blue-900">
-                      <span className="text-xl">💳</span>
-                      <p className="font-extrabold text-sm uppercase tracking-wide">DOKU Payment Gateway (Online)</p>
+                      <span className="text-xl">📱</span>
+                      <p className="font-extrabold text-sm uppercase tracking-wide">DOKU Payment Gateway (QRIS)</p>
                     </div>
                     <div className="text-xs text-blue-800 leading-relaxed font-semibold space-y-2">
                       <p>
-                        Pembayaran diproses via gateway online DOKU Jokul API secara otomatis.
+                        Pembayaran diproses otomatis via QRIS Dinamis DOKU Jokul API.
                       </p>
                       <p className="bg-white/80 p-2.5 rounded-xl border border-blue-200/80 text-[11px] text-blue-950 font-bold">
-                        Catatan: <span className="font-mono text-blue-700">{selectedOrder.notes || 'DOKU Gateway (Tenant: BRN-0232-1788668958800)'}</span>
+                        Catatan: <span className="font-mono text-blue-700">{selectedOrder.notes || 'DOKU QRIS Gateway (Tenant: BRN-0232-1788668958800)'}</span>
                       </p>
                     </div>
                   </div>
@@ -742,14 +742,14 @@ function AdminOrdersPageContent() {
                         className="flex-1 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-655 hover:text-rose-600 font-bold py-3 rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <X size={15} />
-                        <span>{selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER' || selectedOrder.payment_proof === 'DOKU_GATEWAY' ? 'Tolak / Batalkan' : 'Tolak Bukti'}</span>
+                        <span>{selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER' || selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS' ? 'Tolak / Batalkan' : 'Tolak Bukti'}</span>
                       </button>
                       <button
                         onClick={() => handleApprove(selectedOrder)}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/10 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <Check size={15} />
-                        <span>{selectedOrder.payment_proof === 'DOKU_GATEWAY' ? 'Konfirmasi Pembayaran DOKU' : (selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Terima Pembayaran Kasir' : 'Terima Bukti'}</span>
+                        <span>{(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? 'Konfirmasi Pembayaran DOKU QRIS' : (selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Terima Pembayaran Kasir' : 'Terima Bukti'}</span>
                       </button>
                     </>
                   )}

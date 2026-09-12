@@ -10,7 +10,7 @@ import { useTranslation } from '@/stores/languageStore';
 import { 
   User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
   Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
-  Store, CreditCard, Banknote
+  Store, CreditCard, Banknote, ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,8 +43,8 @@ function CustomerOrderFormContent() {
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier' | 'doku'>('doku');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
-  const [paymentProof, setPaymentProof] = useState<string>('DOKU_GATEWAY');
-  const [paymentProofName, setPaymentProofName] = useState<string>('DOKU Gateway');
+  const [paymentProof, setPaymentProof] = useState<string>('DOKU_QRIS');
+  const [paymentProofName, setPaymentProofName] = useState<string>('QRIS DOKU');
   const [dokuUrl, setDokuUrl] = useState<string | null>(null);
   const [draftOrderId] = useState(() => `ORD-${Date.now().toString().slice(-7)}-${crypto.randomUUID().slice(0, 6)}`);
   const [qrisPayment, setQrisPayment] = useState<{
@@ -56,6 +56,30 @@ function CustomerOrderFormContent() {
     error?: string;
   }>({ loading: false });
   const tenantSlug = searchParams.get('tenant') || process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || '';
+  const callbackStatus = searchParams.get('status');
+  const callbackOrderId = searchParams.get('orderId');
+
+  // Listen to DOKU callback return
+  useEffect(() => {
+    if (callbackStatus === 'doku_callback' && callbackOrderId) {
+      toast.loading('Mengecek status pembayaran QRIS DOKU...', { duration: 3000 });
+      supabase
+        .from('customer_orders')
+        .select('*')
+        .eq('id', callbackOrderId)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setSubmittedOrderId(data.id);
+            setSubmittedOrder(data);
+            setStep(5);
+            if (data.status === 'preparing' || data.status === 'finished') {
+              toast.success('Pembayaran QRIS DOKU berhasil diverifikasi!');
+            }
+          }
+        });
+    }
+  }, [callbackStatus, callbackOrderId]);
 
   // Submitted Order State (for success step tracking)
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
@@ -301,12 +325,12 @@ function CustomerOrderFormContent() {
         customer_email: customerEmail,
         total_amount: getTotal(),
         payment_method: paymentMethod === 'doku' ? 'qris' : paymentMethod,
-        payment_proof: paymentMethod === 'doku' ? 'DOKU_GATEWAY' : paymentMethod === 'cashier' ? 'cashier' : (usesXendit ? `xendit:${qrisPayment.paymentRequestId}` : paymentProof),
+        payment_proof: paymentMethod === 'doku' ? 'DOKU_QRIS' : paymentMethod === 'cashier' ? 'cashier' : (usesXendit ? `xendit:${qrisPayment.paymentRequestId}` : paymentProof),
         status: 'pending_confirmation',
-        notes: paymentMethod === 'doku' ? `DOKU Online Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
+        notes: paymentMethod === 'doku' ? `DOKU QRIS Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
         table_id: tableId === 'takeaway' || !tableId ? null : tableId,
-        created_at: now,
-        updated_at: now
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const response = await fetch('/api/public/orders', {
@@ -318,9 +342,9 @@ function CustomerOrderFormContent() {
           customerEmail,
           tableId: tableId === 'takeaway' || !tableId ? null : tableId,
           paymentMethod: paymentMethod === 'doku' ? 'qris' : paymentMethod,
-          paymentProof: paymentMethod === 'doku' ? 'DOKU_GATEWAY' : (usesXendit ? undefined : paymentProof),
+          paymentProof: paymentMethod === 'doku' ? 'DOKU_QRIS' : (usesXendit ? undefined : paymentProof),
           xenditPaymentRequestId: usesXendit ? qrisPayment.paymentRequestId : undefined,
-          notes: paymentMethod === 'doku' ? `DOKU Online Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
+          notes: paymentMethod === 'doku' ? `DOKU QRIS Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
           items: Object.values(cart).map((item) => ({ productId: item.product.id, quantity: item.qty })),
         }),
       });
@@ -378,6 +402,14 @@ function CustomerOrderFormContent() {
       setSubmittedOrderId(orderId);
       setSubmittedOrder(orderPayload);
       setStep(5);
+
+      // If DOKU URL was generated, prompt redirect to QRIS payment page
+      if (dokuPaymentUrl) {
+        toast.loading('Membuka halaman pembayaran QRIS DOKU...', { duration: 2500 });
+        setTimeout(() => {
+          window.location.href = dokuPaymentUrl!;
+        }, 1200);
+      }
     } catch (err) {
       console.error('Failed to submit order:', err);
       toast.error('Gagal mengirim pesanan. Coba hubungi kasir.');
@@ -1015,8 +1047,8 @@ function CustomerOrderFormContent() {
                       type="button"
                       onClick={() => { 
                         setPaymentMethod('doku'); 
-                        setPaymentProof('DOKU_GATEWAY'); 
-                        setPaymentProofName('DOKU Gateway'); 
+                        setPaymentProof('DOKU_QRIS'); 
+                        setPaymentProofName('QRIS Dinamis (DOKU)'); 
                       }}
                       className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center space-y-1.5 cursor-pointer transition-all ${
                         paymentMethod === 'doku' 
@@ -1024,8 +1056,8 @@ function CustomerOrderFormContent() {
                           : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      <CreditCard size={20} className={paymentMethod === 'doku' ? 'text-blue-600' : ''} />
-                      <span className="text-[10px] uppercase font-bold tracking-wider">DOKU</span>
+                      <QrCode size={20} className={paymentMethod === 'doku' ? 'text-blue-600' : ''} />
+                      <span className="text-[10px] uppercase font-bold tracking-wider">QRIS DOKU</span>
                     </button>
                   )}
                   <button
@@ -1037,7 +1069,7 @@ function CustomerOrderFormContent() {
                       }`}
                   >
                     <QrCode size={22} />
-                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS</span>
+                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS Manual</span>
                   </button>
                   <button
                     type="button"
@@ -1070,18 +1102,18 @@ function CustomerOrderFormContent() {
                   {paymentMethod === 'doku' && (
                     <div className="space-y-4 w-full flex flex-col items-center">
                       <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-                        <CreditCard size={24} />
+                        <QrCode size={24} />
                       </div>
                       <div className="space-y-1 text-center">
-                        <h4 className="text-sm font-black text-slate-900">Pembayaran Online Instan via DOKU</h4>
+                        <h4 className="text-sm font-black text-slate-900">QRIS Dinamis via DOKU Payment Gateway</h4>
                         <p className="text-xs text-slate-500 font-medium max-w-sm">
-                          Bayar otomatis menggunakan QRIS Dinamis, Virtual Account Bank, atau e-Wallet terverifikasi seketika.
+                          Bayar praktis dengan scan kode QRIS menggunakan GoPay, OVO, Dana, ShopeePay, BCA Mobile, atau aplikasi bank mana pun.
                         </p>
                       </div>
 
                       <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs flex items-center space-x-2">
                         <Check size={16} className="shrink-0 text-emerald-600" />
-                        <span>Verifikasi otomatis tanpa perlu upload bukti transfer manual.</span>
+                        <span>Verifikasi pembayaran otomatis tanpa perlu upload bukti foto transfer.</span>
                       </div>
 
                       <div className="bg-blue-50/80 px-4 py-2 border border-blue-100 rounded-xl text-blue-800 font-black text-sm">
@@ -1299,6 +1331,26 @@ function CustomerOrderFormContent() {
                 <div className="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-full text-xs text-indigo-800 font-black mx-auto">
                   <span>🍽️ Meja Pemesan: {selectedTableObj ? selectedTableObj.name : t('takeaway')}</span>
                 </div>
+
+                {/* DOKU QRIS Payment action if pending */}
+                {dokuUrl && submittedOrder.status === 'pending_confirmation' && (
+                  <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-4 rounded-2xl text-center space-y-2.5 max-w-xs mx-auto shadow-sm">
+                    <div className="flex items-center justify-center space-x-1.5 text-blue-700 font-extrabold text-xs">
+                      <QrCode size={16} />
+                      <span>Pembayaran QRIS DOKU</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-snug">Klik tombol di bawah jika halaman pembayaran belum terbuka otomatis:</p>
+                    <a
+                      href={dokuUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                    >
+                      <span>Buka Kode QRIS</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                )}
 
                 {/* Real-time tracker stepper */}
                 <div className="border-t border-slate-100 pt-6 text-left max-w-xs mx-auto space-y-4">

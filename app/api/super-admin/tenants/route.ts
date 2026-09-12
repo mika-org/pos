@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   if (!(await authorized())) return NextResponse.json({ error: 'Akses Super Admin diperlukan' }, { status: 403 });
   const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Data tenant tidak valid' }, { status: 400 });
-  const now = BigInt(Date.now());
+  const now = new Date();
   try {
     const tenant = await prisma.$transaction(async (tx) => {
       const created = await tx.tenant.create({ data: { name: parsed.data.name, slug: parsed.data.slug } });

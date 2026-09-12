@@ -35,15 +35,24 @@ const FIELD_MAP: Partial<Record<TableName, Record<string, string>>> = {
 };
 
 const BIGINT_FIELDS: Partial<Record<TableName, Set<string>>> = {
-  users: new Set(['createdAt', 'updatedAt']),
-  products: new Set(['buyPrice', 'sellPrice', 'stock', 'createdAt', 'updatedAt']),
-  categories: new Set(['createdAt', 'updatedAt']), customers: new Set(['createdAt', 'updatedAt']),
-  suppliers: new Set(['createdAt', 'updatedAt']),
-  transactions: new Set(['date', 'subtotal', 'discount', 'tax', 'total', 'amountPaid', 'change', 'createdAt', 'updatedAt']),
+  products: new Set(['buyPrice', 'sellPrice', 'stock']),
+  transactions: new Set(['subtotal', 'discount', 'tax', 'total', 'amountPaid', 'change']),
   transaction_items: new Set(['price', 'qty', 'discount', 'subtotal']),
-  settings: new Set(['taxPercentage', 'maxFileSize', 'updatedAt']), tables: new Set(['createdAt', 'updatedAt']),
-  customer_orders: new Set(['totalAmount', 'verifiedAt', 'createdAt', 'updatedAt']),
+  settings: new Set(['taxPercentage', 'maxFileSize']),
+  customer_orders: new Set(['totalAmount']),
   customer_order_items: new Set(['quantity', 'price', 'subtotal']),
+};
+
+const DATETIME_FIELDS: Partial<Record<TableName, Set<string>>> = {
+  users: new Set(['createdAt', 'updatedAt']),
+  products: new Set(['createdAt', 'updatedAt']),
+  categories: new Set(['createdAt', 'updatedAt']),
+  customers: new Set(['createdAt', 'updatedAt']),
+  suppliers: new Set(['createdAt', 'updatedAt']),
+  transactions: new Set(['date', 'createdAt', 'updatedAt']),
+  settings: new Set(['updatedAt']),
+  tables: new Set(['createdAt', 'updatedAt']),
+  customer_orders: new Set(['verifiedAt', 'createdAt', 'updatedAt']),
 };
 
 function fieldName(table: TableName, field: string) { return FIELD_MAP[table]?.[field] || field; }
@@ -52,6 +61,16 @@ function coerceValue(table: TableName, field: string, value: unknown) {
   if (BIGINT_FIELDS[table]?.has(field)) {
     if (Array.isArray(value)) return value.map((item) => BigInt(String(item)));
     return BigInt(String(value));
+  }
+  if (DATETIME_FIELDS[table]?.has(field)) {
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value === 'string') {
+      const num = Number(value);
+      if (!isNaN(num) && !value.includes('-') && !value.includes('T')) return new Date(num);
+      return new Date(value);
+    }
+    return new Date(String(value));
   }
   return value;
 }

@@ -100,6 +100,7 @@ export async function createDokuCheckout(
     },
     payment: {
       payment_due_date: 60, // 60 minutes
+      payment_method_types: ['QRIS'],
     },
     customer: {
       name: request.customerName || 'Pelanggan Resto',

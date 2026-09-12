@@ -4,8 +4,8 @@ export interface AppUser {
   email: string;
   password?: string;
   role: 'admin' | 'kasir';
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
   deleted: boolean;
 }
@@ -19,8 +19,8 @@ export interface Product {
   sellPrice: number;
   stock: number;
   imageUrl?: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
   deleted: boolean;
 }
@@ -28,8 +28,8 @@ export interface Product {
 export interface Category {
   id?: string;
   name: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
   deleted: boolean;
 }
@@ -39,8 +39,8 @@ export interface Customer {
   name: string;
   phone: string;
   address?: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
   deleted: boolean;
 }
@@ -50,8 +50,8 @@ export interface Supplier {
   name: string;
   phone: string;
   address?: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
   deleted: boolean;
 }
@@ -59,7 +59,7 @@ export interface Supplier {
 export interface Transaction {
   id?: string;
   no: string;
-  date: number;
+  date: Date | string | number;
   customerId?: string;
   subtotal: number;
   discount: number;
@@ -71,8 +71,8 @@ export interface Transaction {
   note?: string;
   status: 'completed' | 'hold' | 'cancelled';
   userId?: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date | string | number;
+  updatedAt: Date | string | number;
   synced?: boolean;
 }
 
@@ -91,8 +91,8 @@ export interface DiningTable {
   id: string;
   name: string;
   status: 'active' | 'inactive';
-  created_at: number;
-  updated_at: number;
+  created_at: Date | string | number;
+  updated_at: Date | string | number;
 }
 
 export interface CustomerOrder {
@@ -100,15 +100,15 @@ export interface CustomerOrder {
   customer_name: string;
   customer_email: string;
   total_amount: number;
-  payment_method: 'qris' | 'bank_transfer' | 'cashier';
+  payment_method: 'qris' | 'bank_transfer' | 'cashier' | 'doku';
   payment_proof: string;
   status: 'pending_confirmation' | 'preparing' | 'delivery' | 'finished' | 'rejected';
   verified_by?: string | null;
-  verified_at?: number | null;
+  verified_at?: Date | string | number | null;
   notes?: string | null;
   table_id?: string | null;
-  created_at: number;
-  updated_at: number;
+  created_at: Date | string | number;
+  updated_at: Date | string | number;
 }
 
 export interface CustomerOrderItem {
@@ -119,4 +119,3 @@ export interface CustomerOrderItem {
   price: number;
   subtotal: number;
 }
-

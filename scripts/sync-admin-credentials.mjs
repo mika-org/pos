@@ -23,7 +23,7 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
     role,
     tenantId,
     deleted: false,
-    updatedAt: BigInt(Date.now()),
+    updatedAt: new Date(),
   };
 
   if (existing) {
@@ -32,7 +32,7 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
   }
 
   await prisma.user.create({
-    data: { id: defaultId, name, createdAt: BigInt(Date.now()), ...values },
+    data: { id: defaultId, name, createdAt: new Date(), ...values },
   });
 }
 

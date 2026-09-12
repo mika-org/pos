@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   const update: Record<string, unknown> = {
     xenditEnabled: parsed.data.enabled,
     xenditEnvironment: parsed.data.environment,
-    updatedAt: BigInt(Date.now()),
+    updatedAt: new Date(),
   };
   if (parsed.data.clearSecret) update.xenditSecretKeyEncrypted = null;
   else if (parsed.data.secretKey) update.xenditSecretKeyEncrypted = encryptSecret(parsed.data.secretKey);
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       tenantId,
       id: 'default',
       storeName: 'POS System', storeAddress: '-', storePhone: '-',
-      updatedAt: BigInt(Date.now()),
+      updatedAt: new Date(),
       ...update,
     },
   });
