@@ -58,7 +58,7 @@ export default function CategoriesPage() {
           .from('categories')
           .update({
             name: formData.name,
-            updatedAt: Date.now(),
+            updatedAt: new Date().toISOString(),
           })
           .eq('id', editingId);
         if (error) throw error;
@@ -68,8 +68,8 @@ export default function CategoriesPage() {
           .insert({
             id: crypto.randomUUID(),
             name: formData.name,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             deleted: false,
           });
         if (error) throw error;
@@ -94,7 +94,7 @@ export default function CategoriesPage() {
         .from('categories')
         .update({
           deleted: true,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString()
         })
         .eq('id', confirmDelete.id);
       if (error) throw error;

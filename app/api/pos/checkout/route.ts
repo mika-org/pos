@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       await tx.transaction.create({
         data: {
-          tenantId, id: transaction.id, no: transaction.no, date: new Date(Number(transaction.date) || Date.now()),
+          tenantId, id: transaction.id, no: transaction.no, date: transaction.date ? new Date(transaction.date) : now,
           customerId: transaction.customerId || null, subtotal, discount: globalDiscount, tax, total,
           paymentMethod: hold ? '-' : transaction.paymentMethod, amountPaid: hold ? BigInt(0) : amountPaid,
           change: hold ? BigInt(0) : amountPaid - total, note: transaction.note || null,

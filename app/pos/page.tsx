@@ -167,7 +167,7 @@ export default function POSPage() {
       const txData: Transaction = {
         id: txId,
         no: `TRX-${Date.now()}`,
-        date: Date.now(),
+        date: new Date().toISOString(),
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
         tax: taxAmount,
@@ -177,8 +177,8 @@ export default function POSPage() {
         change: paid - finalTotal,
         status: 'completed',
         userId: user?.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const txItems: TransactionItem[] = [];
@@ -235,7 +235,7 @@ export default function POSPage() {
       const txData: Transaction = {
         id: txId,
         no: `HLD-${Date.now()}`,
-        date: Date.now(),
+        date: new Date().toISOString(),
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
         tax: 0,
@@ -244,8 +244,8 @@ export default function POSPage() {
         amountPaid: 0,
         change: 0,
         status: 'hold',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const txItems: TransactionItem[] = [];

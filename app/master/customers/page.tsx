@@ -56,7 +56,7 @@ export default function CustomersPage() {
           .from('customers')
           .update({
             ...formData,
-            updatedAt: Date.now(),
+            updatedAt: new Date().toISOString(),
           })
           .eq('id', editingId);
         if (error) throw error;
@@ -66,8 +66,8 @@ export default function CustomersPage() {
           .insert({
             id: crypto.randomUUID(),
             ...formData,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             deleted: false,
           });
         if (error) throw error;
@@ -92,7 +92,7 @@ export default function CustomersPage() {
         .from('customers')
         .update({
           deleted: true,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString()
         })
         .eq('id', confirmDelete.id);
       if (error) throw error;

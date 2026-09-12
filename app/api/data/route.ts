@@ -44,15 +44,15 @@ const BIGINT_FIELDS: Partial<Record<TableName, Set<string>>> = {
 };
 
 const DATETIME_FIELDS: Partial<Record<TableName, Set<string>>> = {
-  users: new Set(['createdAt', 'updatedAt']),
-  products: new Set(['createdAt', 'updatedAt']),
-  categories: new Set(['createdAt', 'updatedAt']),
-  customers: new Set(['createdAt', 'updatedAt']),
-  suppliers: new Set(['createdAt', 'updatedAt']),
-  transactions: new Set(['date', 'createdAt', 'updatedAt']),
-  settings: new Set(['updatedAt']),
-  tables: new Set(['createdAt', 'updatedAt']),
-  customer_orders: new Set(['verifiedAt', 'createdAt', 'updatedAt']),
+  users: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  products: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  categories: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  customers: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  suppliers: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  transactions: new Set(['date', 'createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  settings: new Set(['updatedAt', 'updated_at']),
+  tables: new Set(['createdAt', 'updatedAt', 'created_at', 'updated_at']),
+  customer_orders: new Set(['verifiedAt', 'createdAt', 'updatedAt', 'verified_at', 'created_at', 'updated_at']),
 };
 
 function fieldName(table: TableName, field: string) { return FIELD_MAP[table]?.[field] || field; }

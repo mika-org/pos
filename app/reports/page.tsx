@@ -95,7 +95,7 @@ export default function ReportsPage() {
             qty: Number(item.qty),
             discount: Number(item.discount || 0),
             subtotal: Number(item.subtotal),
-            date: txs.find(tx => tx.id === item.transactionId)?.date || Date.now()
+            date: txs.find(tx => tx.id === item.transactionId)?.date || new Date().toISOString()
           })),
           ...fetchedOrderItems.map(item => ({
             transactionId: item.order_id,
@@ -105,7 +105,7 @@ export default function ReportsPage() {
             qty: Number(item.quantity),
             discount: 0,
             subtotal: item.subtotal,
-            date: cos.find(co => co.id === item.order_id)?.created_at || Date.now()
+            date: cos.find(co => co.id === item.order_id)?.created_at || new Date().toISOString()
           }))
         ];
 

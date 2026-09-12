@@ -159,7 +159,7 @@ function AdminOrdersPageContent() {
   const handleApprove = async (order: CustomerOrder) => {
     if (!currentUser) return;
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const updatedStatus = 'preparing';
 
       const { error } = await supabase
@@ -197,7 +197,7 @@ function AdminOrdersPageContent() {
     }
 
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const updatedStatus = 'rejected';
 
       const { error } = await supabase
@@ -230,7 +230,7 @@ function AdminOrdersPageContent() {
   // Workflow: Next status update
   const handleUpdateStatus = async (order: CustomerOrder, nextStatus: 'preparing' | 'delivery' | 'finished') => {
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const { error } = await supabase
         .from('customer_orders')
         .update({

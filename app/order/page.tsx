@@ -366,7 +366,6 @@ function CustomerOrderFormContent() {
     setLoading(true);
     try {
       const orderId = draftOrderId;
-      const now = Date.now();
 
       let dokuPaymentUrl: string | null = dokuUrl;
       if (paymentMethod === 'doku' && !dokuPaymentUrl) {

@@ -157,7 +157,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           xenditEnabled: currentSettings.xenditEnabled,
           xenditConfigured: currentSettings.xenditConfigured,
           xenditEnvironment: currentSettings.xenditEnvironment,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString()
         });
       }
     } catch (err) {
@@ -199,7 +199,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           xenditEnabled: updatedSettings.xenditEnabled,
           xenditConfigured: updatedSettings.xenditConfigured,
           xenditEnvironment: updatedSettings.xenditEnvironment,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString()
         });
       if (error) {
         console.error('Failed to save settings to PostgreSQL:', error);

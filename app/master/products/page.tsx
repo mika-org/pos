@@ -71,7 +71,7 @@ export default function ProductsPage() {
         sellPrice: Number(formData.sellPrice),
         stock: Number(formData.stock),
         imageUrl: formData.imageUrl,
-        updatedAt: Date.now(),
+        updatedAt: new Date().toISOString(),
         deleted: false,
       };
 
@@ -87,7 +87,7 @@ export default function ProductsPage() {
           .insert({
             id: crypto.randomUUID(),
             ...payload,
-            createdAt: Date.now()
+            createdAt: new Date().toISOString()
           });
         if (error) throw error;
       }
@@ -111,7 +111,7 @@ export default function ProductsPage() {
         .from('products')
         .update({
           deleted: true,
-          updatedAt: Date.now()
+          updatedAt: new Date().toISOString()
         })
         .eq('id', confirmDelete.id);
       if (error) throw error;
@@ -200,8 +200,8 @@ export default function ProductsPage() {
         .insert({
           id: uuid,
           name: newCategoryName,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           deleted: false
         });
       if (error) throw error;

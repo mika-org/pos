@@ -84,10 +84,11 @@ export default function TablesPage() {
     if (!tableName.trim()) return;
 
     try {
+      const now = new Date().toISOString();
       const payload = {
         name: tableName,
         status: tableStatus,
-        updated_at: Date.now(),
+        updated_at: now,
       };
 
       if (selectedTable) {
@@ -103,7 +104,7 @@ export default function TablesPage() {
           .insert({
             id: newId,
             ...payload,
-            created_at: Date.now(),
+            created_at: now,
           });
         if (error) throw error;
       }
