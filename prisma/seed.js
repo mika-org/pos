@@ -37,8 +37,8 @@ function requireSecret(name) {
 }
 
 async function main() {
-  const now = BigInt(Date.now());
-  const legacyTime = 1718985600000n;
+  const now = new Date();
+  const legacyTime = new Date(1718985600000);
   const tenantSlug = process.env.DEFAULT_TENANT_SLUG || 'restoflow';
   const tenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },

@@ -52,7 +52,7 @@ export function LoginView() {
         {/* Header Rebranding & Logo */}
         <div className="text-center space-y-4">
           <div className="w-14 h-14 bg-linear-to-tr from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto shadow-lg shadow-blue-500/20 transition-transform duration-300 hover:rotate-3 select-none">
-            R
+            V
           </div>
           <div className="space-y-1">
             <h1 className="text-2xl font-black text-white tracking-tight leading-none">Viore Pos</h1>

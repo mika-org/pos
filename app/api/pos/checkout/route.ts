@@ -84,13 +84,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pembayaran Xendit belum diterima' }, { status: 409 });
     }
   }
-  const now = BigInt(Date.now());
+  const now = new Date();
 
   try {
     await prisma.$transaction(async (tx) => {
       await tx.transaction.create({
         data: {
-          tenantId, id: transaction.id, no: transaction.no, date: BigInt(transaction.date),
+          tenantId, id: transaction.id, no: transaction.no, date: transaction.date ? new Date(transaction.date) : now,
           customerId: transaction.customerId || null, subtotal, discount: globalDiscount, tax, total,
           paymentMethod: hold ? '-' : transaction.paymentMethod, amountPaid: hold ? BigInt(0) : amountPaid,
           change: hold ? BigInt(0) : amountPaid - total, note: transaction.note || null,

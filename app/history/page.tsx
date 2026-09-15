@@ -103,7 +103,7 @@ export default function HistoryPage() {
 
       if (error) throw error;
 
-      const mappedItems = ((itemsData || []) as any[]).map(item => ({
+      const mappedItems = ((itemsData || []) as any[]).map((item: any) => ({
         id: item.id,
         transactionId: item.order_id,
         productId: item.product_id,
@@ -243,7 +243,7 @@ export default function HistoryPage() {
                   filteredTransactions.map(tx => (
                     <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-800">{tx.no}</td>
-                      <td className="px-6 py-4 text-slate-600">{format(tx.date, 'dd MMM yyyy, HH:mm')}</td>
+                      <td className="px-6 py-4 text-slate-600">{format(new Date(tx.date), 'dd MMM yyyy, HH:mm')}</td>
                       <td className="px-6 py-4 font-semibold text-blue-600">Rp {tx.total.toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4 text-slate-600">{tx.paymentMethod}</td>
                       <td className="px-6 py-4">
@@ -279,7 +279,7 @@ export default function HistoryPage() {
                   filteredCustomerOrders.map(order => (
                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-800 uppercase text-xs tracking-wider select-all">{order.id}</td>
-                      <td className="px-6 py-4 text-slate-600">{format(order.created_at, 'dd MMM yyyy, HH:mm')}</td>
+                      <td className="px-6 py-4 text-slate-600">{format(new Date(order.created_at), 'dd MMM yyyy, HH:mm')}</td>
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-bold text-slate-800 text-xs">{order.customer_name}</p>

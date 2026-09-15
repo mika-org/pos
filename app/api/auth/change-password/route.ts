@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: await hashPassword(parsed.data.newPassword), updatedAt: BigInt(Date.now()) },
+    data: { password: await hashPassword(parsed.data.newPassword), updatedAt: new Date() },
   });
   await destroySession();
 

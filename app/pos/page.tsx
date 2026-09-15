@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Receipt } from '@/components/pos/Receipt';
 import { supabase } from '@/lib/supabase';
-import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode, ExternalLink } from 'lucide-react';
 
 export default function POSPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,7 +17,7 @@ export default function POSPage() {
   const [completedTransaction, setCompletedTransaction] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'Tunai' | 'QRIS' | 'Transfer'>('Tunai');
-  const [qrisCheckout, setQrisCheckout] = useState<{ loading: boolean; mode?: 'xendit' | 'static'; qrImage?: string; paymentRequestId?: string; status?: string; error?: string }>({ loading: false });
+  const [qrisCheckout, setQrisCheckout] = useState<{ loading: boolean; mode?: 'doku' | 'xendit' | 'static'; qrImage?: string; paymentRequestId?: string; paymentUrl?: string; status?: string; error?: string }>({ loading: false });
   const qrisReferenceRef = useRef('');
   const [activeTab, setActiveTab] = useState<'menu' | 'cart'>('menu');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -45,14 +45,15 @@ export default function POSPage() {
       const payload = await response.json();
       if (cancelled) return;
       if (!response.ok) setQrisCheckout({ loading: false, error: payload.error || 'QRIS tidak tersedia' });
-      else setQrisCheckout({ loading: false, mode: payload.mode, qrImage: payload.qrImage, paymentRequestId: payload.paymentRequestId, status: payload.status });
+      else setQrisCheckout({ loading: false, mode: payload.mode, qrImage: payload.qrImage, paymentRequestId: payload.paymentRequestId, paymentUrl: payload.paymentUrl, status: payload.status });
     };
     void createQris();
     return () => { cancelled = true; };
   }, [isPaymentModalOpen, paymentMethod, finalTotal]);
 
   useEffect(() => {
-    if (qrisCheckout.mode !== 'xendit' || !qrisCheckout.paymentRequestId || qrisCheckout.status === 'SUCCEEDED') return;
+    const isDynamic = qrisCheckout.mode === 'xendit' || qrisCheckout.mode === 'doku';
+    if (!isDynamic || !qrisCheckout.paymentRequestId || qrisCheckout.status === 'SUCCEEDED') return;
     const interval = setInterval(async () => {
       const response = await fetch(`/api/payments/qris/${encodeURIComponent(qrisCheckout.paymentRequestId!)}`, { cache: 'no-store' });
       const payload = await response.json();
@@ -149,7 +150,7 @@ export default function POSPage() {
     const taxAmount = subtotalWithDiscount * (settings.taxPercentage / 100);
     const finalTotal = subtotalWithDiscount + taxAmount;
     
-    const dynamicQris = paymentMethod === 'QRIS' && qrisCheckout.mode === 'xendit';
+    const dynamicQris = paymentMethod === 'QRIS' && (qrisCheckout.mode === 'xendit' || qrisCheckout.mode === 'doku');
     if (dynamicQris && qrisCheckout.status !== 'SUCCEEDED') {
       alert('Pembayaran Xendit belum diterima.');
       return;
@@ -166,7 +167,7 @@ export default function POSPage() {
       const txData: Transaction = {
         id: txId,
         no: `TRX-${Date.now()}`,
-        date: Date.now(),
+        date: new Date().toISOString(),
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
         tax: taxAmount,
@@ -176,8 +177,8 @@ export default function POSPage() {
         change: paid - finalTotal,
         status: 'completed',
         userId: user?.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const txItems: TransactionItem[] = [];
@@ -234,7 +235,7 @@ export default function POSPage() {
       const txData: Transaction = {
         id: txId,
         no: `HLD-${Date.now()}`,
-        date: Date.now(),
+        date: new Date().toISOString(),
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
         tax: 0,
@@ -243,8 +244,8 @@ export default function POSPage() {
         amountPaid: 0,
         change: 0,
         status: 'hold',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const txItems: TransactionItem[] = [];
@@ -612,6 +613,24 @@ export default function POSPage() {
                       <div className="text-center">
                         <p className="text-xs font-semibold text-slate-400">Total Pembayaran</p>
                         <p className="text-base font-bold text-slate-800">Rp {finalTotal.toLocaleString('id-ID')}</p>
+                        {qrisCheckout.mode === 'doku' && (
+                          <div className="flex flex-col items-center gap-1 mt-1">
+                            <p className={`text-xs font-bold ${qrisCheckout.status === 'SUCCEEDED' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                              {qrisCheckout.status === 'SUCCEEDED' ? '✓ Pembayaran diterima via DOKU' : 'Menunggu pembayaran QRIS (DOKU)...'}
+                            </p>
+                            {qrisCheckout.paymentUrl && (
+                              <a
+                                href={qrisCheckout.paymentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                              >
+                                <span>Buka Halaman DOKU</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            )}
+                          </div>
+                        )}
                         {qrisCheckout.mode === 'xendit' && <p className={`text-xs font-bold mt-1 ${qrisCheckout.status === 'SUCCEEDED' ? 'text-emerald-600' : 'text-amber-600'}`}>{qrisCheckout.status === 'SUCCEEDED' ? 'Pembayaran diterima' : 'Menunggu pembayaran Xendit'}</p>}
                         {qrisCheckout.mode === 'static' && <p className="text-xs font-bold mt-1 text-amber-600">QRIS statis / konfirmasi manual</p>}
                       </div>

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     paymentProof = String(await persistDataUrl(context.tenantId, input.paymentProof, 'payment-proof', false));
   }
 
-  const now = BigInt(Date.now());
+  const now = new Date();
   try {
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.customerOrder.create({

@@ -28,7 +28,7 @@ export const exportPostgresDb = async () => {
     }
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(data, `postgres_backup_${timestamp}.json`);
+    downloadFile(data, `viorepos_postgres_backup_${timestamp}.json`);
     
     return { success: true };
   } catch (error: unknown) {
@@ -36,3 +36,6 @@ export const exportPostgresDb = async () => {
     return { success: false, error: error instanceof Error ? error.message : 'Backup gagal' };
   }
 };
+
+// Backward-compatible alias
+export const exportSupabaseDb = exportPostgresDb;

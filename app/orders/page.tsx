@@ -115,7 +115,7 @@ function AdminOrdersPageContent() {
         `)
         .eq('order_id', orderId);
 
-      const mappedItems = ((itemsData || []) as any[]).map(item => {
+      const mappedItems = ((itemsData || []) as any[]).map((item: any) => {
         const prodName = (item as any).products?.name || 'Unknown Product';
         return {
           id: item.id,
@@ -159,7 +159,7 @@ function AdminOrdersPageContent() {
   const handleApprove = async (order: CustomerOrder) => {
     if (!currentUser) return;
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const updatedStatus = 'preparing';
 
       const { error } = await supabase
@@ -197,7 +197,7 @@ function AdminOrdersPageContent() {
     }
 
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const updatedStatus = 'rejected';
 
       const { error } = await supabase
@@ -230,7 +230,7 @@ function AdminOrdersPageContent() {
   // Workflow: Next status update
   const handleUpdateStatus = async (order: CustomerOrder, nextStatus: 'preparing' | 'delivery' | 'finished') => {
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const { error } = await supabase
         .from('customer_orders')
         .update({
@@ -459,7 +459,15 @@ function AdminOrdersPageContent() {
                     </td>
                     <td className="p-4 font-black text-slate-800 text-sm">Rp {order.total_amount.toLocaleString('id-ID')}</td>
                     <td className="p-4 uppercase text-xs font-extrabold text-slate-500">
-                      {order.payment_method === 'qris' ? 'QRIS' : order.payment_method === 'bank_transfer' ? 'Transfer' : 'Bayar Kasir'}
+                      {(order.payment_proof === 'DOKU_GATEWAY' || order.payment_proof === 'DOKU_QRIS') ? (
+                        <span className="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-black text-[10px]">QRIS DOKU</span>
+                      ) : (order.payment_method === 'cashier' || order.payment_proof === 'CASHIER') ? (
+                        'Bayar di Kasir'
+                      ) : order.payment_method === 'qris' ? (
+                        'QRIS'
+                      ) : (
+                        'Transfer Bank'
+                      )}
                     </td>
                     <td className="p-4">{getStatusBadge(order.status)}</td>
                     <td className="p-4 text-xs text-slate-500 font-semibold">
@@ -611,10 +619,10 @@ function AdminOrdersPageContent() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center pl-1">
                   <h3 className="text-xs text-slate-500 font-black uppercase tracking-wider">
-                    {selectedOrder.payment_method === 'cashier' ? 'Metode Pembayaran' : t('paymentProofPreview')}
+                    {(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? 'Pembayaran QRIS DOKU' : ((selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Metode Pembayaran' : t('paymentProofPreview'))}
                   </h3>
-                  {selectedOrder.payment_method !== 'cashier' && (
-                    <button
+                  {selectedOrder.payment_method !== 'cashier' && selectedOrder.payment_proof !== 'CASHIER' && selectedOrder.payment_proof !== 'DOKU_GATEWAY' && selectedOrder.payment_proof !== 'DOKU_QRIS' && (
+                    <button 
                       onClick={() => handleDownloadProof(selectedOrder)}
                       className="text-xs text-blue-600 font-bold hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
                     >
@@ -624,8 +632,23 @@ function AdminOrdersPageContent() {
                   )}
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex justify-center items-center overflow-hidden min-h-[220px] max-h-[350px]">
-                  {selectedOrder.payment_method === 'cashier' ? (
+                {(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? (
+                  <div className="p-5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3 shadow-sm text-left">
+                    <div className="flex items-center space-x-2.5 text-blue-900">
+                      <span className="text-xl">📱</span>
+                      <p className="font-extrabold text-sm uppercase tracking-wide">DOKU Payment Gateway (QRIS)</p>
+                    </div>
+                    <div className="text-xs text-blue-800 leading-relaxed font-semibold space-y-2">
+                      <p>
+                        Pembayaran diproses otomatis via QRIS Dinamis DOKU Jokul API.
+                      </p>
+                      <p className="bg-white/80 p-2.5 rounded-xl border border-blue-200/80 text-[11px] text-blue-950 font-bold">
+                        Catatan: <span className="font-mono text-blue-700">{selectedOrder.notes || 'DOKU QRIS Gateway (Tenant: BRN-0232-1788668958800)'}</span>
+                      </p>
+                    </div>
+                  </div>
+                ) : (selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex justify-center items-center overflow-hidden min-h-[220px] max-h-[350px]">
                     <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[340px] animate-in fade-in duration-300">
                       <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center border border-blue-200">
                         <Banknote size={24} className="text-blue-600" />
@@ -635,34 +658,42 @@ function AdminOrdersPageContent() {
                         Pesanan ini menggunakan metode Bayar di Kasir. Silakan terima pembayaran langsung dari pelanggan di kasir sebesar total tagihan, kemudian klik tombol <strong>Terima Pembayaran Kasir</strong> untuk memproses pesanan ke dapur.
                       </p>
                     </div>
-                  ) : selectedOrder.payment_proof.startsWith('data:application/pdf;') ? (
-                    <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[280px]">
-                      <FileText className="mx-auto text-rose-500" size={48} />
-                      <p className="text-xs font-bold text-slate-700">Berkas Dokumen PDF</p>
-                      <button
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex justify-center items-center overflow-hidden min-h-[220px] max-h-[350px]">
+                    {selectedOrder.payment_proof?.startsWith('data:application/pdf;') ? (
+                      <div className="text-center p-6 space-y-3 bg-white border border-slate-100 rounded-2xl shadow-sm w-full max-w-[280px]">
+                        <FileText className="mx-auto text-rose-500" size={48} />
+                        <p className="text-xs font-bold text-slate-700">Berkas Dokumen PDF</p>
+                        <button 
+                          onClick={() => {
+                            const w = window.open();
+                            w?.document.write(`<iframe src="${selectedOrder.payment_proof}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Buka PDF di Tab Baru
+                        </button>
+                      </div>
+                    ) : selectedOrder.payment_proof ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selectedOrder.payment_proof}
+                        alt="Payment Proof"
+                        className="max-w-full max-h-[300px] rounded-xl object-contain border border-slate-100 cursor-pointer shadow-sm hover:scale-[1.02] transition-transform duration-300"
                         onClick={() => {
                           const w = window.open();
-                          w?.document.write(`<iframe src="${selectedOrder.payment_proof}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                          w?.document.write(`<img src="${selectedOrder.payment_proof}" style="max-width:100%; max-height:100%; object-contain:fit; margin:auto; display:block;"/>`);
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                      >
-                        Buka PDF di Tab Baru
-                      </button>
-                    </div>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selectedOrder.payment_proof}
-                      alt="Payment Proof"
-                      className="max-w-full max-h-[300px] rounded-xl object-contain border border-slate-100 cursor-pointer shadow-sm hover:scale-[1.02] transition-transform duration-300"
-                      onClick={() => {
-                        const w = window.open();
-                        w?.document.write(`<img src="${selectedOrder.payment_proof}" style="max-width:100%; max-height:100%; object-contain:fit; margin:auto; display:block;"/>`);
-                      }}
-                      title="Klik untuk memperbesar"
-                    />
-                  )}
-                </div>
+                        title="Klik untuk memperbesar"
+                      />
+                    ) : (
+                      <div className="text-center p-6 text-slate-400">
+                        <p className="text-xs font-medium">Tidak ada berkas bukti pembayaran.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -711,14 +742,14 @@ function AdminOrdersPageContent() {
                         className="flex-1 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-655 hover:text-rose-600 font-bold py-3 rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <X size={15} />
-                        <span>{selectedOrder.payment_method === 'cashier' ? 'Tolak Pesanan' : 'Tolak Bukti'}</span>
+                        <span>{selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER' || selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS' ? 'Tolak / Batalkan' : 'Tolak Bukti'}</span>
                       </button>
                       <button
                         onClick={() => handleApprove(selectedOrder)}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/10 transition-all cursor-pointer text-xs uppercase tracking-wider"
                       >
                         <Check size={15} />
-                        <span>{selectedOrder.payment_method === 'cashier' ? 'Terima Pembayaran Kasir' : 'Terima Bukti'}</span>
+                        <span>{(selectedOrder.payment_proof === 'DOKU_GATEWAY' || selectedOrder.payment_proof === 'DOKU_QRIS') ? 'Konfirmasi Pembayaran DOKU QRIS' : (selectedOrder.payment_method === 'cashier' || selectedOrder.payment_proof === 'CASHIER') ? 'Terima Pembayaran Kasir' : 'Terima Bukti'}</span>
                       </button>
                     </>
                   )}

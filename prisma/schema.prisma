@@ -50,8 +50,8 @@ model User {
   email     String
   password  String?
   role      UserRole
-  createdAt BigInt   @map("createdAt")
-  updatedAt BigInt   @map("updatedAt")
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
   deleted   Boolean  @default(false)
 
   @@unique([tenantId, email])
@@ -64,8 +64,8 @@ model Category {
   id        String
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
-  createdAt BigInt    @map("createdAt")
-  updatedAt BigInt    @map("updatedAt")
+  createdAt DateTime  @default(now()) @map("createdAt")
+  updatedAt DateTime  @updatedAt @map("updatedAt")
   deleted   Boolean   @default(false)
   products  Product[]
 
@@ -86,8 +86,8 @@ model Product {
   sellPrice  BigInt              @map("sellPrice")
   stock      BigInt
   imageUrl   String?             @map("imageUrl")
-  createdAt  BigInt              @map("createdAt")
-  updatedAt  BigInt              @map("updatedAt")
+  createdAt  DateTime            @default(now()) @map("createdAt")
+  updatedAt  DateTime            @updatedAt @map("updatedAt")
   deleted    Boolean             @default(false)
   orderItems CustomerOrderItem[]
 
@@ -100,13 +100,13 @@ model Product {
 model Customer {
   tenantId  String
   id        String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
   phone     String
   address   String?
-  createdAt BigInt  @map("createdAt")
-  updatedAt BigInt  @map("updatedAt")
-  deleted   Boolean @default(false)
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+  deleted   Boolean  @default(false)
 
   @@id([tenantId, id])
   @@index([tenantId, deleted])
@@ -116,13 +116,13 @@ model Customer {
 model Supplier {
   tenantId  String
   id        String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
   phone     String
   address   String?
-  createdAt BigInt  @map("createdAt")
-  updatedAt BigInt  @map("updatedAt")
-  deleted   Boolean @default(false)
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+  deleted   Boolean  @default(false)
 
   @@id([tenantId, id])
   @@index([tenantId, deleted])
@@ -134,7 +134,7 @@ model Transaction {
   id            String
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   no            String
-  date          BigInt
+  date          DateTime          @default(now())
   customerId    String?           @map("customerId")
   subtotal      BigInt
   discount      BigInt
@@ -146,8 +146,8 @@ model Transaction {
   note          String?
   status        String
   userId        String?           @map("userId")
-  createdAt     BigInt            @map("createdAt")
-  updatedAt     BigInt            @map("updatedAt")
+  createdAt     DateTime          @default(now()) @map("createdAt")
+  updatedAt     DateTime          @updatedAt @map("updatedAt")
   items         TransactionItem[]
 
   @@id([tenantId, id])
@@ -176,20 +176,20 @@ model TransactionItem {
 
 model StoreSettings {
   tenantId                     String
-  id                           String  @default("default")
-  tenant                       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  storeName                    String  @default("POS System") @map("storeName")
-  storeAddress                 String  @default("-") @map("storeAddress")
-  storePhone                   String  @default("-") @map("storePhone")
-  taxPercentage                BigInt  @default(0) @map("taxPercentage")
-  qrisImage                    String? @map("qrisImage")
-  maxFileSize                  BigInt  @default(5) @map("maxFileSize")
-  bankAccounts                 String  @default("[]") @map("bank_accounts")
-  xenditEnabled                Boolean @default(false) @map("xendit_enabled")
-  xenditEnvironment            String  @default("development") @map("xendit_environment")
-  xenditSecretKeyEncrypted     String? @map("xendit_secret_key_encrypted") @db.Text
-  xenditCallbackTokenEncrypted String? @map("xendit_callback_token_encrypted") @db.Text
-  updatedAt                    BigInt  @map("updatedAt")
+  id                           String   @default("default")
+  tenant                       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  storeName                    String   @default("POS System") @map("storeName")
+  storeAddress                 String   @default("-") @map("storeAddress")
+  storePhone                   String   @default("-") @map("storePhone")
+  taxPercentage                BigInt   @default(0) @map("taxPercentage")
+  qrisImage                    String?  @map("qrisImage")
+  maxFileSize                  BigInt   @default(5) @map("maxFileSize")
+  bankAccounts                 String   @default("[]") @map("bank_accounts")
+  xenditEnabled                Boolean  @default(false) @map("xendit_enabled")
+  xenditEnvironment            String   @default("development") @map("xendit_environment")
+  xenditSecretKeyEncrypted     String?  @map("xendit_secret_key_encrypted") @db.Text
+  xenditCallbackTokenEncrypted String?  @map("xendit_callback_token_encrypted") @db.Text
+  updatedAt                    DateTime @updatedAt @map("updatedAt")
 
   @@id([tenantId, id])
   @@map("settings")
@@ -201,8 +201,8 @@ model DiningTable {
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
   status    String          @default("active")
-  createdAt BigInt          @map("created_at")
-  updatedAt BigInt          @map("updated_at")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
   orders    CustomerOrder[]
 
   @@id([tenantId, id])
@@ -223,12 +223,12 @@ model CustomerOrder {
   xenditPaymentRequestId String?             @map("xendit_payment_request_id")
   status                 String
   verifiedBy             String?             @map("verified_by")
-  verifiedAt             BigInt?             @map("verified_at")
+  verifiedAt             DateTime?           @map("verified_at")
   notes                  String?
   tableId                String?             @map("table_id")
   diningTable            DiningTable?        @relation(fields: [tenantId, tableId], references: [tenantId, id], onDelete: Restrict)
-  createdAt              BigInt              @map("created_at")
-  updatedAt              BigInt              @map("updated_at")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
   items                  CustomerOrderItem[]
 
   @@id([tenantId, id])

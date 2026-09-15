@@ -99,11 +99,14 @@ CREATE TABLE public.users (
 -- 8. Create Settings Table
 CREATE TABLE public.settings (
     id TEXT PRIMARY KEY DEFAULT 'default',
-    "storeName" TEXT NOT NULL DEFAULT 'POS System',
-    "storeAddress" TEXT NOT NULL DEFAULT 'Jl. Contoh Alamat No. 123',
+    "storeName" TEXT NOT NULL DEFAULT 'ViorePos',
+    "storeAddress" TEXT NOT NULL DEFAULT 'Jl. Merdeka No. 1, Jakarta Pusat',
     "storePhone" TEXT NOT NULL DEFAULT '08123456789',
     "taxPercentage" BIGINT NOT NULL DEFAULT 0,
     "qrisImage" TEXT,
+    "maxFileSize" BIGINT DEFAULT 5,
+    bank_accounts TEXT DEFAULT '[]',
+    doku_settings TEXT,
     "updatedAt" BIGINT NOT NULL
 );
 

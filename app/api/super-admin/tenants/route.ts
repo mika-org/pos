@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'Data tenant tidak valid' }, { status: 400 });
   const passwordError = getPasswordValidationError(parsed.data.adminPassword);
   if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
-  const now = BigInt(Date.now());
+  const now = new Date();
   try {
     const tenant = await prisma.$transaction(async (tx) => {
       const created = await tx.tenant.create({ data: { name: parsed.data.name, slug: parsed.data.slug } });
@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
       },
       data: {
         password: await hashPassword(passwordReset.data.newPassword),
-        updatedAt: BigInt(Date.now()),
+        updatedAt: new Date(),
       },
     });
     if (result.count !== 1) return NextResponse.json({ error: 'Admin tenant tidak ditemukan' }, { status: 404 });

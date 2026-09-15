@@ -217,3 +217,6 @@ export const supabase = {
     channel.unsubscribe();
   },
 };
+
+export const db = supabase;
+export default supabase;

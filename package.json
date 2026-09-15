@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:3200": "next dev -p 3200",
     "postinstall": "prisma generate",
     "prebuild": "prisma generate",
     "build": "next build",
@@ -17,8 +18,12 @@
     "db:sync-admin-credentials": "node scripts/sync-admin-credentials.mjs",
     "db:verify": "node scripts/verify-database.mjs",
     "db:studio": "prisma studio",
+    "migrate": "node scripts/migrate.js",
+    "migrate:dry": "node scripts/migrate.js --dry-run",
+    "migrate:file": "node scripts/migrate.js --file",
     "migrate:supabase": "node scripts/migrate-supabase-to-postgres.mjs",
-    "migrate:supabase:dry": "node scripts/migrate-supabase-to-postgres.mjs --dry-run"
+    "migrate:supabase:dry": "node scripts/migrate-supabase-to-postgres.mjs --dry-run",
+    "db:init": "node scripts/init-db.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -37,6 +42,8 @@
     "jose": "^6.2.9",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
+    "nodemailer": "^10.0.6",
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -51,6 +58,8 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",

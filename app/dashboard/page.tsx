@@ -169,10 +169,16 @@ export default function Dashboard() {
       
       const intervalRevenue = 
         transactions
-          .filter(tx => tx.date >= intervalStart.getTime() && tx.date < intervalEnd.getTime() && tx.status === 'completed')
+          .filter(tx => {
+            const t = new Date(tx.date).getTime();
+            return t >= intervalStart.getTime() && t < intervalEnd.getTime() && tx.status === 'completed';
+          })
           .reduce((sum, tx) => sum + tx.total, 0) +
         customerOrders
-          .filter(co => co.created_at >= intervalStart.getTime() && co.created_at < intervalEnd.getTime() && co.status === 'finished')
+          .filter(co => {
+            const t = new Date(co.created_at).getTime();
+            return t >= intervalStart.getTime() && t < intervalEnd.getTime() && co.status === 'finished';
+          })
           .reduce((sum, co) => sum + co.total_amount, 0);
           
       chartData.push({
@@ -191,10 +197,16 @@ export default function Dashboard() {
       
       const dayRevenue = 
         transactions
-          .filter(tx => tx.date >= start && tx.date <= end && tx.status === 'completed')
+          .filter(tx => {
+            const t = new Date(tx.date).getTime();
+            return t >= start && t <= end && tx.status === 'completed';
+          })
           .reduce((sum, tx) => sum + tx.total, 0) +
         customerOrders
-          .filter(co => co.created_at >= start && co.created_at <= end && co.status === 'finished')
+          .filter(co => {
+            const t = new Date(co.created_at).getTime();
+            return t >= start && t <= end && co.status === 'finished';
+          })
           .reduce((sum, co) => sum + co.total_amount, 0);
         
       chartData.push({

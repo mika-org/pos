@@ -37,7 +37,7 @@ export function Receipt({ transaction, items }: ReceiptProps) {
           </div>
           <div className="flex justify-between">
             <span>Tgl:</span>
-            <span>{format(transaction.date, 'dd/MM/yy HH:mm')}</span>
+            <span>{format(new Date(transaction.date), 'dd/MM/yy HH:mm')}</span>
           </div>
           <div className="flex justify-between">
             <span>Kasir:</span>

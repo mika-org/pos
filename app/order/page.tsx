@@ -7,10 +7,10 @@ import { Product, Category, DiningTable, CustomerOrder } from '@/lib/db';
 import { TranslationKey } from '@/lib/translations';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/stores/languageStore';
-import {
-  User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check,
-  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass,
-  Banknote
+import { 
+  User, Mail, ArrowRight, ArrowLeft, ShoppingBag, Search, Plus, Minus, Check, 
+  Upload, QrCode, FileText, CheckCircle, RefreshCw, Languages, Copy, Compass, Gift,
+  Store, CreditCard, Banknote, ExternalLink, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,10 +41,15 @@ function CustomerOrderFormContent() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier'>('qris');
+  const [paymentMethod, setPaymentMethod] = useState<'qris' | 'bank_transfer' | 'cashier' | 'doku'>('doku');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
-  const [paymentProof, setPaymentProof] = useState<string>('');
-  const [paymentProofName, setPaymentProofName] = useState<string>('');
+  const [paymentProof, setPaymentProof] = useState<string>('DOKU_QRIS');
+  const [paymentProofName, setPaymentProofName] = useState<string>('QRIS DOKU');
+  const [dokuUrl, setDokuUrl] = useState<string | null>(null);
+  const [dokuQrImage, setDokuQrImage] = useState<string | null>(null);
+  const [dokuLoading, setDokuLoading] = useState<boolean>(false);
+  const [dokuError, setDokuError] = useState<string | null>(null);
+  const [dokuPaid, setDokuPaid] = useState<boolean>(false);
   const [draftOrderId] = useState(() => `ORD-${Date.now().toString().slice(-7)}-${crypto.randomUUID().slice(0, 6)}`);
   const [qrisPayment, setQrisPayment] = useState<{
     loading: boolean;
@@ -55,6 +60,30 @@ function CustomerOrderFormContent() {
     error?: string;
   }>({ loading: false });
   const tenantSlug = searchParams.get('tenant') || process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || '';
+  const callbackStatus = searchParams.get('status');
+  const callbackOrderId = searchParams.get('orderId');
+
+  // Listen to DOKU callback return
+  useEffect(() => {
+    if (callbackStatus === 'doku_callback' && callbackOrderId) {
+      toast.loading('Mengecek status pembayaran QRIS DOKU...', { duration: 3000 });
+      supabase
+        .from('customer_orders')
+        .select('*')
+        .eq('id', callbackOrderId)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setSubmittedOrderId(data.id);
+            setSubmittedOrder(data);
+            setStep(5);
+            if (data.status === 'preparing' || data.status === 'finished') {
+              toast.success('Pembayaran QRIS DOKU berhasil diverifikasi!');
+            }
+          }
+        });
+    }
+  }, [callbackStatus, callbackOrderId]);
 
   // Submitted Order State (for success step tracking)
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
@@ -208,6 +237,74 @@ function CustomerOrderFormContent() {
     return () => { cancelled = true; };
   }, [step, paymentMethod, draftOrderId, tenantSlug, qrisAmount]);
 
+  // Generate DOKU QRIS dynamic payment when customer enters Step 4
+  useEffect(() => {
+    if (step !== 4 || paymentMethod !== 'doku') return;
+    let cancelled = false;
+
+    const generateDokuQr = async () => {
+      if (dokuQrImage && dokuUrl) return;
+      setDokuLoading(true);
+      setDokuError(null);
+      try {
+        const res = await fetch('/api/doku/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: draftOrderId,
+            amount: getTotal(),
+            customerName: customerName || 'Pelanggan',
+            customerEmail: customerEmail || 'customer@viorepos.com',
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.success && data.paymentUrl) {
+          setDokuUrl(data.paymentUrl);
+          setDokuQrImage(data.qrImage || null);
+          setPaymentProof('DOKU_QRIS');
+        } else {
+          setDokuError(data.error || 'Gagal memuat QRIS DOKU');
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setDokuError(err?.message || 'Koneksi ke DOKU gagal');
+        }
+      } finally {
+        if (!cancelled) setDokuLoading(false);
+      }
+    };
+
+    void generateDokuQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, paymentMethod, draftOrderId, customerName, customerEmail, dokuQrImage, dokuUrl]);
+
+  // Poll DOKU Payment Status automatically
+  useEffect(() => {
+    if (paymentMethod !== 'doku' || !draftOrderId || dokuPaid) return;
+    if (step !== 4 && step !== 5) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/doku/status/${encodeURIComponent(draftOrderId)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success && data.paid) {
+          setDokuPaid(true);
+          toast.success('Pembayaran QRIS DOKU berhasil diverifikasi!');
+          if (step === 5 && submittedOrder) {
+            setSubmittedOrder((prev) => prev ? { ...prev, status: 'preparing' } : prev);
+          }
+        }
+      } catch {
+        // silent polling
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [paymentMethod, draftOrderId, dokuPaid, step, submittedOrder]);
+
   useEffect(() => {
     if (qrisPayment.mode !== 'xendit' || !qrisPayment.paymentRequestId || qrisPayment.status === 'SUCCEEDED') return;
     const interval = setInterval(async () => {
@@ -261,7 +358,7 @@ function CustomerOrderFormContent() {
       toast.error('Selesaikan pembayaran Xendit terlebih dahulu');
       return;
     }
-    if (paymentMethod !== 'cashier' && !usesXendit && !paymentProof) {
+    if (paymentMethod !== 'cashier' && paymentMethod !== 'doku' && !usesXendit && !paymentProof) {
       toast.error(t('proofRequired'));
       return;
     }
@@ -269,20 +366,43 @@ function CustomerOrderFormContent() {
     setLoading(true);
     try {
       const orderId = draftOrderId;
-      const now = Date.now();
+
+      let dokuPaymentUrl: string | null = dokuUrl;
+      if (paymentMethod === 'doku' && !dokuPaymentUrl) {
+        try {
+          const res = await fetch('/api/doku/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId,
+              amount: getTotal(),
+              customerName,
+              customerEmail,
+            })
+          });
+          const dokuRes = await res.json();
+          if (dokuRes.success && dokuRes.paymentUrl) {
+            dokuPaymentUrl = dokuRes.paymentUrl;
+            setDokuUrl(dokuPaymentUrl);
+            if (dokuRes.qrImage) setDokuQrImage(dokuRes.qrImage);
+          }
+        } catch (e) {
+          console.warn('DOKU checkout API error:', e);
+        }
+      }
 
       const orderPayload: CustomerOrder = {
         id: orderId,
         customer_name: customerName,
         customer_email: customerEmail,
         total_amount: getTotal(),
-        payment_method: paymentMethod,
-        payment_proof: paymentMethod === 'cashier' ? 'cashier' : (usesXendit ? `xendit:${qrisPayment.paymentRequestId}` : paymentProof),
+        payment_method: paymentMethod === 'doku' ? 'qris' : paymentMethod,
+        payment_proof: paymentMethod === 'doku' ? 'DOKU_QRIS' : paymentMethod === 'cashier' ? 'cashier' : (usesXendit ? `xendit:${qrisPayment.paymentRequestId}` : paymentProof),
         status: 'pending_confirmation',
-        notes: null,
+        notes: paymentMethod === 'doku' ? `DOKU QRIS Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
         table_id: tableId === 'takeaway' || !tableId ? null : tableId,
-        created_at: now,
-        updated_at: now
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const response = await fetch('/api/public/orders', {
@@ -293,23 +413,60 @@ function CustomerOrderFormContent() {
           customerName,
           customerEmail,
           tableId: tableId === 'takeaway' || !tableId ? null : tableId,
-          paymentMethod,
-          paymentProof: usesXendit ? undefined : paymentProof,
+          paymentMethod: paymentMethod === 'doku' ? 'qris' : paymentMethod,
+          paymentProof: paymentMethod === 'doku' ? 'DOKU_QRIS' : (usesXendit ? undefined : paymentProof),
           xenditPaymentRequestId: usesXendit ? qrisPayment.paymentRequestId : undefined,
+          notes: paymentMethod === 'doku' ? `DOKU QRIS Gateway (${settings.doku?.clientId || 'BRN-0232-1788668958800'})` : null,
           items: Object.values(cart).map((item) => ({ productId: item.product.id, quantity: item.qty })),
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Gagal menyimpan pesanan');
 
+      // Send real notification email via SMTP Gmail
+      fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: `Pesanan Berhasil Diterima [${orderId}] - ViorePos`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #2563eb; margin: 0; font-size: 24px; font-weight: 800;">ViorePos</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Konfirmasi Pesanan Pelanggan</p>
+              </div>
+              <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #334155;">Halo <strong>${customerName}</strong>,</p>
+                <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5;">Pesanan Anda berhasil kami terima dan sedang dipersiapkan oleh tim dapur kami.</p>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">No. Pesanan:</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #0f172a;">${orderId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">Total Bayar:</td>
+                  <td style="padding: 8px 0; font-weight: 800; text-align: right; color: #2563eb; font-size: 16px;">Rp ${getTotal().toLocaleString('id-ID')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;">Status:</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #eab308;">Menunggu Konfirmasi</td>
+                </tr>
+              </table>
+              <div style="text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                Terima kasih atas pesanan Anda. Hubungi kasir jika membutuhkan bantuan.
+              </div>
+            </div>
+          `
+        })
+      }).catch(e => console.warn('Email dispatch notice:', e));
+
       // Print simulations
       console.log(t('simEmailSentCustomer', { email: customerEmail, id: orderId, status: 'Pending Confirmation' }));
       console.log(t('simAdminNotification', { id: orderId, name: customerName, total: getTotal().toLocaleString('id-ID') }));
-
       toast.success(t('orderSuccess'));
-
-      // Show Simulation Banner to make it extremely visual!
-      toast(`📧 [Notifikasi] Simulasi email pesanan berhasil dikirim ke ${customerEmail}`, {
+      toast(`📧 Konfirmasi pesanan telah dikirim ke ${customerEmail}`, {
         icon: '✉️',
         duration: 5000,
       });
@@ -317,6 +474,11 @@ function CustomerOrderFormContent() {
       setSubmittedOrderId(orderId);
       setSubmittedOrder(orderPayload);
       setStep(5);
+
+      // If DOKU URL was generated, show success feedback
+      if (dokuPaymentUrl) {
+        toast.success('Kode QRIS DOKU siap dipindai.');
+      }
     } catch (err) {
       console.error('Failed to submit order:', err);
       toast.error('Gagal mengirim pesanan. Coba hubungi kasir.');
@@ -386,7 +548,6 @@ function CustomerOrderFormContent() {
           products ( name )
         `)
         .eq('order_id', orderData.id);
-
       const mappedItems = ((itemsData || []) as Array<{
         quantity: number;
         price: number;
@@ -454,7 +615,7 @@ function CustomerOrderFormContent() {
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-linear-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-md shadow-blue-500/20 transition-transform duration-300 hover:rotate-3">
-            P
+            V
           </div>
           <div>
             <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">Viore Pos</h1>
@@ -949,7 +1110,25 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Payment Method Selector */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className={`grid ${settings.doku?.enabled !== false ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
+                  {settings.doku?.enabled !== false && (
+                    <button
+                      type="button"
+                      onClick={() => { 
+                        setPaymentMethod('doku'); 
+                        setPaymentProof('DOKU_QRIS'); 
+                        setPaymentProofName('QRIS Dinamis (DOKU)'); 
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center space-y-1.5 cursor-pointer transition-all ${
+                        paymentMethod === 'doku' 
+                          ? 'border-blue-600 bg-blue-50/50 text-blue-800 font-black shadow-sm' 
+                          : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <QrCode size={20} className={paymentMethod === 'doku' ? 'text-blue-600' : ''} />
+                      <span className="text-[10px] uppercase font-bold tracking-wider">QRIS DOKU</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('qris'); setPaymentProof(''); setPaymentProofName(''); }}
@@ -959,7 +1138,7 @@ function CustomerOrderFormContent() {
                       }`}
                   >
                     <QrCode size={22} />
-                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS</span>
+                    <span className="text-xs uppercase tracking-wider font-extrabold text-[10px] sm:text-xs">QRIS Manual</span>
                   </button>
                   <button
                     type="button"
@@ -989,6 +1168,91 @@ function CustomerOrderFormContent() {
                 <div className="p-4 bg-slate-50/60 border border-slate-250/60 rounded-3xl flex flex-col items-center text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3">Informasi Pembayaran</p>
 
+                  {paymentMethod === 'doku' && (
+                    <div className="space-y-4 w-full flex flex-col items-center">
+                      <div className="space-y-1 text-center">
+                        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-[11px] font-extrabold uppercase tracking-wider mb-1">
+                          <QrCode size={14} />
+                          <span>QRIS Dinamis (DOKU)</span>
+                        </div>
+                        <h4 className="text-base font-black text-slate-900">Pindai Kode QRIS untuk Membayar</h4>
+                        <p className="text-xs text-slate-500 font-medium max-w-sm">
+                          Gunakan GoPay, OVO, Dana, ShopeePay, BCA Mobile, Livin, atau aplikasi m-Banking mana pun.
+                        </p>
+                      </div>
+
+                      {/* QR Code Container */}
+                      <div className="p-4 bg-white rounded-3xl border border-slate-200 shadow-md flex flex-col items-center justify-center transition-transform duration-300 hover:scale-[1.02]">
+                        {dokuLoading ? (
+                          <div className="w-56 h-56 flex flex-col items-center justify-center space-y-3 text-slate-400">
+                            <RefreshCw size={28} className="animate-spin text-blue-600" />
+                            <span className="text-xs font-bold">Membuat Kode QRIS DOKU...</span>
+                          </div>
+                        ) : dokuQrImage ? (
+                          <div className="space-y-3 flex flex-col items-center">
+                            <img
+                              src={dokuQrImage}
+                              alt="QRIS DOKU"
+                              className="w-56 h-56 object-contain rounded-xl"
+                            />
+                            <div className="flex items-center space-x-2 text-[11px] font-bold text-slate-500">
+                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span>Pindai langsung dari kamera / e-wallet</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-56 h-56 flex flex-col items-center justify-center p-4 text-center text-xs text-rose-600 space-y-2">
+                            <AlertCircle size={24} />
+                            <p className="font-bold">{dokuError || 'Gagal memuat QRIS'}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDokuQrImage(null);
+                                setDokuUrl(null);
+                              }}
+                              className="text-[11px] text-blue-600 underline font-bold cursor-pointer"
+                            >
+                              Coba lagi
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Total Amount Tag */}
+                      <div className="bg-blue-50 px-5 py-2.5 border border-blue-200 rounded-2xl text-blue-900 font-black text-base flex items-center space-x-2">
+                        <span className="text-xs font-semibold text-blue-600">Total:</span>
+                        <span>Rp {getTotal().toLocaleString('id-ID')}</span>
+                      </div>
+
+                      {/* Status indicator */}
+                      <div className="flex items-center space-x-2">
+                        {dokuPaid ? (
+                          <div className="px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold flex items-center space-x-1.5">
+                            <Check size={14} className="text-emerald-600" />
+                            <span>Pembayaran QRIS Berhasil Diterima!</span>
+                          </div>
+                        ) : (
+                          <div className="px-3.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold flex items-center space-x-1.5 animate-pulse">
+                            <RefreshCw size={12} className="animate-spin text-amber-600" />
+                            <span>Menunggu scan & pembayaran pelanggan...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* External Link for Mobile Users */}
+                      {dokuUrl && (
+                        <a
+                          href={dokuUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-2 text-xs font-extrabold text-blue-600 hover:text-blue-700 hover:underline pt-1 cursor-pointer"
+                        >
+                          <span>Buka di Halaman Pembayaran DOKU</span>
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </div>
+                  )}
                   {paymentMethod === 'qris' && (
                     <div className="space-y-4 flex flex-col items-center">
                       <p className="text-xs text-slate-500 font-semibold">{t('qrisDesc')}</p>
@@ -1098,7 +1362,7 @@ function CustomerOrderFormContent() {
                 </div>
 
                 {/* Upload Proof Area */}
-                {paymentMethod !== 'cashier' && !(paymentMethod === 'qris' && qrisPayment.mode === 'xendit') && (
+                {paymentMethod !== 'cashier' && paymentMethod !== 'doku' && !(paymentMethod === 'qris' && qrisPayment.mode === 'xendit') && (
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('uploadProof')}</label>
 
@@ -1140,7 +1404,7 @@ function CustomerOrderFormContent() {
                   </button>
                   <button
                     onClick={handleSubmitOrder}
-                    disabled={loading || (paymentMethod !== 'cashier' && !(paymentMethod === 'qris' && qrisPayment.status === 'SUCCEEDED') && !paymentProof)}
+                    disabled={loading || (paymentMethod !== 'cashier' && paymentMethod !== 'doku' && !(paymentMethod === 'qris' && qrisPayment.status === 'SUCCEEDED') && !paymentProof)}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl shadow-md shadow-emerald-500/15 flex items-center justify-center transition-colors cursor-pointer text-xs uppercase tracking-wider"
                   >
                     {loading ? (
@@ -1199,6 +1463,38 @@ function CustomerOrderFormContent() {
                 <div className="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-full text-xs text-indigo-800 font-black mx-auto">
                   <span>🍽️ Meja Pemesan: {selectedTableObj ? selectedTableObj.name : t('takeaway')}</span>
                 </div>
+
+                {/* DOKU QRIS Payment action if pending */}
+                {(dokuQrImage || dokuUrl) && submittedOrder.status === 'pending_confirmation' && (
+                  <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-5 rounded-3xl text-center space-y-3 max-w-sm mx-auto shadow-sm">
+                    <div className="flex items-center justify-center space-x-1.5 text-blue-700 font-extrabold text-xs">
+                      <QrCode size={18} />
+                      <span>Kode QRIS Pembayaran DOKU</span>
+                    </div>
+
+                    {dokuQrImage && (
+                      <div className="p-3 bg-white rounded-2xl border border-slate-200 inline-block shadow-sm">
+                        <img src={dokuQrImage} alt="QRIS DOKU" className="w-44 h-44 object-contain mx-auto" />
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Pindai kode QR di atas atau klik tombol di bawah untuk membuka halaman pembayaran resmi DOKU:
+                    </p>
+
+                    {dokuUrl && (
+                      <a
+                        href={dokuUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                      >
+                        <span>Buka Halaman DOKU</span>
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Real-time tracker stepper */}
                 <div className="border-t border-slate-100 pt-6 text-left max-w-xs mx-auto space-y-4">

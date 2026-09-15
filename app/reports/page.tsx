@@ -95,7 +95,7 @@ export default function ReportsPage() {
             qty: Number(item.qty),
             discount: Number(item.discount || 0),
             subtotal: Number(item.subtotal),
-            date: txs.find(tx => tx.id === item.transactionId)?.date || Date.now()
+            date: txs.find(tx => tx.id === item.transactionId)?.date || new Date().toISOString()
           })),
           ...fetchedOrderItems.map(item => ({
             transactionId: item.order_id,
@@ -105,7 +105,7 @@ export default function ReportsPage() {
             qty: Number(item.quantity),
             discount: 0,
             subtotal: item.subtotal,
-            date: cos.find(co => co.id === item.order_id)?.created_at || Date.now()
+            date: cos.find(co => co.id === item.order_id)?.created_at || new Date().toISOString()
           }))
         ];
 
@@ -142,7 +142,7 @@ export default function ReportsPage() {
       paymentMethod: co.payment_method === 'qris' ? 'QRIS' : co.payment_method === 'bank_transfer' ? 'Transfer Bank' : 'Bayar Kasir',
       type: co.table_id ? `Meja (${co.table_id.replace('meja_', 'Meja ')})` : 'Self-Order (Takeaway)'
     }))
-  ].sort((a, b) => b.date - a.date); // Newest first
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Newest first
 
   // Summary Metrics
   const totalRevenue = combinedItems.reduce((sum, item) => sum + item.total, 0);
@@ -180,10 +180,10 @@ export default function ReportsPage() {
 
     const dayRevenue =
       transactions
-        .filter(tx => tx.date >= start && tx.date <= end)
+        .filter(tx => { const t = new Date(tx.date).getTime(); return t >= start && t <= end; })
         .reduce((sum, tx) => sum + tx.total, 0) +
       customerOrders
-        .filter(co => co.created_at >= start && co.created_at <= end)
+        .filter(co => { const t = new Date(co.created_at).getTime(); return t >= start && t <= end; })
         .reduce((sum, co) => sum + co.total_amount, 0);
 
     chartData.push({
@@ -499,7 +499,7 @@ export default function ReportsPage() {
                 combinedItems.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50">
                     <td className="px-6 py-3 font-medium text-slate-800 select-all uppercase text-xs tracking-wider">{item.no}</td>
-                    <td className="px-6 py-3 text-slate-600">{format(item.date, 'dd MMM yyyy, HH:mm')}</td>
+                    <td className="px-6 py-3 text-slate-600">{format(new Date(item.date), 'dd MMM yyyy, HH:mm')}</td>
                     <td className="px-6 py-3">
                       <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${item.type.includes('Meja') ? 'bg-blue-100 text-blue-800' :
                         item.type.includes('Takeaway') ? 'bg-amber-100 text-amber-800' :

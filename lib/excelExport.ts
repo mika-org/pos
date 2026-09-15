@@ -361,7 +361,7 @@ export const exportSalesReportExcel = async (
   });
 
   combinedItems.forEach((item, idx) => {
-    const formattedDate = format(item.date, 'yyyy-MM-dd HH:mm:ss');
+    const formattedDate = format(new Date(item.date), 'yyyy-MM-dd HH:mm:ss');
     const row = detailSheet.addRow([
       item.no.toUpperCase(),
       formattedDate,
@@ -449,8 +449,8 @@ export const exportSalesReportExcel = async (
     };
   });
 
-  soldItems.sort((a, b) => b.date - a.date).forEach((item, idx) => {
-    const formattedDate = format(item.date, 'yyyy-MM-dd HH:mm:ss');
+  soldItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach((item, idx) => {
+    const formattedDate = format(new Date(item.date), 'yyyy-MM-dd HH:mm:ss');
     const row = itemSheet.addRow([
       item.transactionId.substring(0, 8).toUpperCase(),
       formattedDate,

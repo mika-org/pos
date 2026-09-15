@@ -24,7 +24,7 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
     role,
     tenantId,
     deleted: false,
-    updatedAt: BigInt(Date.now()),
+    updatedAt: new Date(),
   };
 
   if (existing) {
@@ -44,7 +44,7 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
       id: defaultId,
       name,
       password: await bcrypt.hash(password, 12),
-      createdAt: BigInt(Date.now()),
+      createdAt: new Date(),
       ...values,
     },
   });
