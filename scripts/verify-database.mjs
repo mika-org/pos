@@ -1,10 +1,10 @@
 import nextEnv from '@next/env';
-import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 
 nextEnv.loadEnvConfig(process.cwd());
 
 const prisma = new PrismaClient();
+const bcryptHashPattern = /^\$2[ab]\$(0[4-9]|[12]\d|3[01])\$[./A-Za-z0-9]{53}$/;
 
 try {
   const slug = process.env.DEFAULT_TENANT_SLUG || 'restoflow';
@@ -14,7 +14,7 @@ try {
   });
   if (!tenant) throw new Error(`Tenant ${slug} tidak ditemukan`);
 
-  const [categories, products, tables, users, settings, files, attempts, migrations, superAdmin, tenantAdmin] = await Promise.all([
+  const [categories, products, tables, users, settings, files, attempts, migrations, superAdmin, tenantAdmin, passwordAccounts] = await Promise.all([
     prisma.category.count({ where: { tenantId: tenant.id } }),
     prisma.product.count({ where: { tenantId: tenant.id } }),
     prisma.diningTable.count({ where: { tenantId: tenant.id } }),
@@ -31,18 +31,17 @@ try {
       where: { tenantId: tenant.id, email: process.env.TENANT_ADMIN_EMAIL?.toLowerCase(), role: 'admin', deleted: false },
       select: { email: true, password: true },
     }),
+    prisma.user.findMany({
+      where: { deleted: false },
+      select: { id: true, password: true },
+    }),
   ]);
 
-  const superAdminPasswordValid = Boolean(
-    superAdmin && process.env.SUPER_ADMIN_PASSWORD
-    && superAdmin.password
-    && await bcrypt.compare(process.env.SUPER_ADMIN_PASSWORD, superAdmin.password),
-  );
-  const tenantAdminPasswordValid = Boolean(
-    tenantAdmin && process.env.TENANT_ADMIN_PASSWORD
-    && tenantAdmin.password
-    && await bcrypt.compare(process.env.TENANT_ADMIN_PASSWORD, tenantAdmin.password),
-  );
+  const invalidPasswordHashCount = passwordAccounts.filter(
+    (account) => !account.password || !bcryptHashPattern.test(account.password),
+  ).length;
+  const superAdminPasswordValid = Boolean(superAdmin?.password && bcryptHashPattern.test(superAdmin.password));
+  const tenantAdminPasswordValid = Boolean(tenantAdmin?.password && bcryptHashPattern.test(tenantAdmin.password));
 
   console.log({
     database: new URL(process.env.DATABASE_URL).pathname.slice(1),
@@ -50,13 +49,14 @@ try {
     counts: { categories, products, tables, users, settings, files, attempts },
     appliedMigrations: migrations[0]?.count ?? 0,
     accounts: {
-      superAdmin: { email: superAdmin?.email, passwordValid: superAdminPasswordValid },
-      tenantAdmin: { email: tenantAdmin?.email, passwordValid: tenantAdminPasswordValid },
+      superAdmin: { email: superAdmin?.email, bcryptHashValid: superAdminPasswordValid },
+      tenantAdmin: { email: tenantAdmin?.email, bcryptHashValid: tenantAdminPasswordValid },
     },
+    passwordHashes: { checked: passwordAccounts.length, invalid: invalidPasswordHashCount },
   });
 
-  if (!superAdminPasswordValid || !tenantAdminPasswordValid) {
-    throw new Error('Verifikasi kredensial seed gagal');
+  if (!superAdminPasswordValid || !tenantAdminPasswordValid || invalidPasswordHashCount > 0) {
+    throw new Error('Verifikasi hash BCrypt akun gagal');
   }
 } finally {
   await prisma.$disconnect();

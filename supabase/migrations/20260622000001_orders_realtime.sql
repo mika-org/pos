@@ -68,12 +68,12 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.settings (id, "storeName", "storeAddress", "storePhone", "taxPercentage", "updatedAt", "maxFileSize", bank_accounts)
 VALUES (
   'default',
-  'RestoFlow POS',
+  'Viore Pos',
   'Jl. Merdeka No. 1, Jakarta Pusat',
   '021-5550123',
   11,
   1718985600000,
   5,
-  '[{"bankName":"BCA","accountNumber":"1234567890","accountName":"RestoFlow Store"},{"bankName":"Mandiri","accountNumber":"0987654321","accountName":"RestoFlow Store"}]'
+  '[{"bankName":"BCA","accountNumber":"1234567890","accountName":"Viore Store"},{"bankName":"Mandiri","accountNumber":"0987654321","accountName":"Viore Store"}]'
 )
 ON CONFLICT (id) DO NOTHING;

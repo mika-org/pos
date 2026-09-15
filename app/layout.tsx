@@ -8,7 +8,7 @@ import { Analytics } from '@vercel/analytics/react';
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "RestoFlow POS - Smart & Premium Point of Sale",
+  title: "Viore Pos - Smart & Premium Point of Sale",
   description: "Modern Cloud-Synced Smart Point of Sale System for Restaurants",
 };
 

@@ -1,6 +1,6 @@
-# RestoFlow POS - Smart & Premium Point of Sale
+# Viore Pos - Smart & Premium Point of Sale
 
-RestoFlow adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
+Viore Pos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, dan **Shadcn UI**.
 
 ---
 
@@ -71,7 +71,7 @@ Salin `.env.example` menjadi `.env`, lalu isi `DATABASE_URL`, secret sesi/enkrip
 | `npm run db:generate` | Generate Prisma Client |
 | `npm run db:migrate` | Terapkan migration Prisma yang belum dijalankan |
 | `npm run db:seed` | Seed tenant awal, Super Admin, admin tenant, kategori, produk, meja, dan settings |
-| `npm run db:verify` | Verifikasi migration, jumlah seed, dan hash kredensial pada database target |
+| `npm run db:verify` | Verifikasi migration, jumlah seed, dan format hash BCrypt pada database target |
 | `npm run migrate:supabase:dry` | Hitung row Supabase tanpa menulis PostgreSQL |
 | `npm run migrate:supabase` | Import seluruh tabel dan file Base64/Storage Supabase secara idempotent |
 
@@ -127,6 +127,8 @@ Akses aplikasi di browser melalui:
 - Halaman Order Meja: [http://localhost:3000/order?table=meja_01&tenant=restoflow](http://localhost:3000/order?table=meja_01&tenant=restoflow)
 
 Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment saat seed dijalankan.
+
+Password Super Admin dan admin tenant dapat diubah dari aplikasi. Deploy mempertahankan hash BCrypt valid yang sudah tersimpan di database; `db:sync-admin-credentials` memakai password `.env` hanya untuk akun baru atau hash lama yang tidak valid. Untuk pemulihan darurat dari nilai `.env`, jalankan sekali dengan `SYNC_ADMIN_PASSWORDS=true`.
 
 ### Environment deployment VPS
 

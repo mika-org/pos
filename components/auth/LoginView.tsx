@@ -55,7 +55,7 @@ export function LoginView() {
             R
           </div>
           <div className="space-y-1">
-            <h1 className="text-2xl font-black text-white tracking-tight leading-none">RestoFlow</h1>
+            <h1 className="text-2xl font-black text-white tracking-tight leading-none">Viore Pos</h1>
             <p className="text-[10px] text-blue-400 font-extrabold uppercase tracking-widest">Smart POS & Resto Platform</p>
           </div>
           <p className="text-xs text-slate-400 font-medium max-w-xs mx-auto leading-relaxed">
@@ -151,7 +151,7 @@ export function LoginView() {
 
         {/* Footer info decoration */}
         <p className="text-[9px] text-slate-500 font-bold text-center uppercase tracking-widest select-none">
-          RestoFlow © 2026
+          Viore Pos © 2026
         </p>
 
       </div>

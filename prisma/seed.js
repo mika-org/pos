@@ -42,8 +42,8 @@ async function main() {
   const tenantSlug = process.env.DEFAULT_TENANT_SLUG || 'restoflow';
   const tenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },
-    update: { name: 'RestoFlow POS', status: 'active' },
-    create: { id: 'tenant_restoflow', slug: tenantSlug, name: 'RestoFlow POS', status: 'active' },
+    update: { name: 'Viore Pos', status: 'active' },
+    create: { id: 'tenant_restoflow', slug: tenantSlug, name: 'Viore Pos', status: 'active' },
   });
 
   const superAdminEmail = requireSecret('SUPER_ADMIN_EMAIL').toLowerCase();
@@ -61,9 +61,9 @@ async function main() {
   }
   const existingTenantAdmin = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: tenantAdminEmail } });
   if (existingTenantAdmin) {
-    await prisma.user.update({ where: { id: existingTenantAdmin.id }, data: { name: 'Admin RestoFlow', password: tenantAdminPassword, role: 'admin', deleted: false, updatedAt: now } });
+    await prisma.user.update({ where: { id: existingTenantAdmin.id }, data: { name: 'Admin Viore Pos', password: tenantAdminPassword, role: 'admin', deleted: false, updatedAt: now } });
   } else {
-    await prisma.user.create({ data: { id: 'user_tenant_admin', tenantId: tenant.id, name: 'Admin RestoFlow', email: tenantAdminEmail, password: tenantAdminPassword, role: 'admin', createdAt: now, updatedAt: now } });
+    await prisma.user.create({ data: { id: 'user_tenant_admin', tenantId: tenant.id, name: 'Admin Viore Pos', email: tenantAdminEmail, password: tenantAdminPassword, role: 'admin', createdAt: now, updatedAt: now } });
   }
 
   for (const [id, name] of categories) {
@@ -99,14 +99,14 @@ async function main() {
     create: {
       tenantId: tenant.id,
       id: 'default',
-      storeName: 'RestoFlow POS',
+      storeName: 'Viore Pos',
       storeAddress: 'Jl. Merdeka No. 1, Jakarta Pusat',
       storePhone: '021-5550123',
       taxPercentage: 11n,
       maxFileSize: 5n,
       bankAccounts: JSON.stringify([
-        { id: 'seed-bca', bankName: 'BCA', accountNumber: '1234567890', accountHolder: 'RestoFlow Store' },
-        { id: 'seed-mandiri', bankName: 'Mandiri', accountNumber: '0987654321', accountHolder: 'RestoFlow Store' },
+        { id: 'seed-bca', bankName: 'BCA', accountNumber: '1234567890', accountHolder: 'Viore Store' },
+        { id: 'seed-mandiri', bankName: 'Mandiri', accountNumber: '0987654321', accountHolder: 'Viore Store' },
       ]),
       updatedAt: now,
     },

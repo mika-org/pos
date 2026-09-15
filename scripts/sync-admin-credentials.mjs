@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 nextEnv.loadEnvConfig(process.cwd());
 
 const prisma = new PrismaClient();
+const forcePasswordSync = process.env.SYNC_ADMIN_PASSWORDS === 'true';
+const bcryptHashPattern = /^\$2[ab]\$(0[4-9]|[12]\d|3[01])\$[./A-Za-z0-9]{53}$/;
 
 function required(name) {
   const value = process.env[name];
@@ -19,7 +21,6 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
   });
   const values = {
     email: normalizedEmail,
-    password: await bcrypt.hash(password, 12),
     role,
     tenantId,
     deleted: false,
@@ -27,13 +28,27 @@ async function syncUser({ email, password, role, tenantId, defaultId, name }) {
   };
 
   if (existing) {
-    await prisma.user.update({ where: { id: existing.id }, data: values });
-    return;
+    const shouldUpdatePassword = forcePasswordSync || !existing.password || !bcryptHashPattern.test(existing.password);
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        ...values,
+        ...(shouldUpdatePassword ? { password: await bcrypt.hash(password, 12) } : {}),
+      },
+    });
+    return { created: false, passwordUpdated: shouldUpdatePassword };
   }
 
   await prisma.user.create({
-    data: { id: defaultId, name, createdAt: BigInt(Date.now()), ...values },
+    data: {
+      id: defaultId,
+      name,
+      password: await bcrypt.hash(password, 12),
+      createdAt: BigInt(Date.now()),
+      ...values,
+    },
   });
+  return { created: true, passwordUpdated: true };
 }
 
 try {
@@ -41,7 +56,7 @@ try {
   const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
   if (!tenant) throw new Error(`Tenant ${tenantSlug} tidak ditemukan; jalankan db:seed terlebih dahulu`);
 
-  await syncUser({
+  const superAdminResult = await syncUser({
     email: required('SUPER_ADMIN_EMAIL'),
     password: required('SUPER_ADMIN_PASSWORD'),
     role: 'super_admin',
@@ -49,16 +64,23 @@ try {
     defaultId: 'user_super_admin',
     name: 'Super Admin',
   });
-  await syncUser({
+  const tenantAdminResult = await syncUser({
     email: required('TENANT_ADMIN_EMAIL'),
     password: required('TENANT_ADMIN_PASSWORD'),
     role: 'admin',
     tenantId: tenant.id,
     defaultId: 'user_tenant_admin',
-    name: 'Admin RestoFlow',
+    name: 'Admin Viore Pos',
   });
 
-  console.log('Kredensial Super Admin dan admin tenant telah disinkronkan dari .env.');
+  console.log({
+    mode: forcePasswordSync ? 'force-password-reset-from-env' : 'bootstrap-preserve-database-passwords',
+    superAdmin: superAdminResult,
+    tenantAdmin: tenantAdminResult,
+  });
+  if (!forcePasswordSync) {
+    console.log('Password akun yang sudah ada dipertahankan. Gunakan SYNC_ADMIN_PASSWORDS=true hanya untuk pemulihan darurat.');
+  }
 } finally {
   await prisma.$disconnect();
 }

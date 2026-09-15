@@ -6,6 +6,7 @@ import { Save, Store, Calculator, Database, Cloud, QrCode, UploadCloud, X, Landm
 import { exportPostgresDb } from '@/lib/backupUtils';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/stores/languageStore';
+import { ChangePasswordForm } from '@/components/auth/ChangePasswordForm';
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettingsStore();
@@ -448,6 +449,7 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+      <ChangePasswordForm />
     </div>
   );
 }

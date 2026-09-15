@@ -1,6 +1,6 @@
-import { hash } from 'bcrypt';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getPasswordValidationError, hashPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { toJsonSafe } from '@/lib/serialization';
@@ -19,6 +19,13 @@ const UpdateSchema = z.object({
   status: z.enum(['active', 'suspended']).optional(),
 });
 
+const ResetAdminPasswordSchema = z.object({
+  action: z.literal('reset_admin_password'),
+  tenantId: z.string().uuid().or(z.string().startsWith('tenant_')),
+  adminId: z.string().min(1).max(100),
+  newPassword: z.string().min(1).max(200),
+});
+
 async function authorized() {
   const session = await getSession();
   return session?.role === 'super_admin';
@@ -30,6 +37,11 @@ export async function GET() {
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { users: true, products: true, transactions: true, customerOrders: true } },
+      users: {
+        where: { role: 'admin', deleted: false },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, email: true },
+      },
       settings: { where: { id: 'default' }, select: { xenditEnabled: true, xenditSecretKeyEncrypted: true, storeName: true } },
     },
   });
@@ -37,6 +49,7 @@ export async function GET() {
     tenants: toJsonSafe(tenants.map((tenant) => ({
       id: tenant.id, slug: tenant.slug, name: tenant.name, status: tenant.status,
       createdAt: tenant.createdAt, counts: tenant._count,
+      admins: tenant.users,
       storeName: tenant.settings[0]?.storeName || tenant.name,
       xenditEnabled: tenant.settings[0]?.xenditEnabled || false,
       xenditConfigured: Boolean(tenant.settings[0]?.xenditSecretKeyEncrypted),
@@ -48,6 +61,8 @@ export async function POST(request: Request) {
   if (!(await authorized())) return NextResponse.json({ error: 'Akses Super Admin diperlukan' }, { status: 403 });
   const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Data tenant tidak valid' }, { status: 400 });
+  const passwordError = getPasswordValidationError(parsed.data.adminPassword);
+  if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
   const now = BigInt(Date.now());
   try {
     const tenant = await prisma.$transaction(async (tx) => {
@@ -55,7 +70,7 @@ export async function POST(request: Request) {
       await tx.user.create({
         data: {
           id: crypto.randomUUID(), tenantId: created.id, name: parsed.data.adminName,
-          email: parsed.data.adminEmail, password: await hash(parsed.data.adminPassword, 12),
+          email: parsed.data.adminEmail, password: await hashPassword(parsed.data.adminPassword),
           role: 'admin', createdAt: now, updatedAt: now,
         },
       });
@@ -82,7 +97,28 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!(await authorized())) return NextResponse.json({ error: 'Akses Super Admin diperlukan' }, { status: 403 });
-  const parsed = UpdateSchema.safeParse(await request.json().catch(() => null));
+  const body = await request.json().catch(() => null);
+  const passwordReset = ResetAdminPasswordSchema.safeParse(body);
+  if (passwordReset.success) {
+    const passwordError = getPasswordValidationError(passwordReset.data.newPassword);
+    if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
+    const result = await prisma.user.updateMany({
+      where: {
+        id: passwordReset.data.adminId,
+        tenantId: passwordReset.data.tenantId,
+        role: 'admin',
+        deleted: false,
+      },
+      data: {
+        password: await hashPassword(passwordReset.data.newPassword),
+        updatedAt: BigInt(Date.now()),
+      },
+    });
+    if (result.count !== 1) return NextResponse.json({ error: 'Admin tenant tidak ditemukan' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+
+  const parsed = UpdateSchema.safeParse(body);
   if (!parsed.success || (!parsed.data.name && !parsed.data.status)) {
     return NextResponse.json({ error: 'Perubahan tenant tidak valid' }, { status: 400 });
   }

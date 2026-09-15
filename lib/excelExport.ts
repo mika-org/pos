@@ -17,8 +17,8 @@ export const exportSalesReportExcel = async (
   const workbook = new ExcelJS.Workbook();
   
   // Setup workbook properties
-  workbook.creator = 'RestoFlow POS';
-  workbook.lastModifiedBy = 'RestoFlow POS';
+  workbook.creator = 'Viore Pos';
+  workbook.lastModifiedBy = 'Viore Pos';
   workbook.created = new Date();
   workbook.modified = new Date();
 
@@ -29,7 +29,7 @@ export const exportSalesReportExcel = async (
   // Page Title
   summarySheet.mergeCells('A1:L1');
   const titleCell = summarySheet.getCell('A1');
-  titleCell.value = 'RESTOFLOW - LAPORAN RINGKASAN PENJUALAN';
+  titleCell.value = 'VIORE POS - LAPORAN RINGKASAN PENJUALAN';
   titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   titleCell.fill = {

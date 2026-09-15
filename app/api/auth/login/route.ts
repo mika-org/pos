@@ -1,6 +1,6 @@
-import { compare } from 'bcrypt';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { verifyPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { createSession } from '@/lib/session';
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     include: { tenant: { select: { id: true, slug: true, name: true, status: true } } },
   });
 
-  if (!user?.password || !(await compare(parsed.data.password, user.password))) {
+  if (!user?.password || !(await verifyPassword(parsed.data.password, user.password))) {
     return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
   }
   if (user.role !== 'super_admin' && (!user.tenant || user.tenant.status !== 'active')) {

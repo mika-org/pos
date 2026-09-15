@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { hash } from 'bcrypt';
 import { NextRequest, NextResponse } from 'next/server';
+import { getPasswordValidationError, hashPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { toJsonSafe } from '@/lib/serialization';
 import { materializeDataFields } from '@/lib/storage';
@@ -162,7 +162,11 @@ export async function POST(request: NextRequest) {
       delete data.tenantId;
       if (table === 'users' && typeof data.password === 'string') {
         if (!data.password) delete data.password;
-        else if (!data.password.startsWith('$2')) data.password = await hash(data.password, 12);
+        else {
+          const passwordError = getPasswordValidationError(data.password);
+          if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
+          data.password = await hashPassword(data.password);
+        }
       }
       if (table === 'users' && !['admin', 'kasir'].includes(String(data.role))) {
         return NextResponse.json({ error: 'Role pengguna tidak valid' }, { status: 400 });
