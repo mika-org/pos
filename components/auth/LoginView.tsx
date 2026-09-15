@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { Lock, Mail, AlertCircle, Eye, EyeOff, Building2 } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function LoginView() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [tenantSlug, setTenantSlug] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,14 +23,15 @@ export function LoginView() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password, tenantSlug: tenantSlug || undefined }),
+        body: JSON.stringify({ email, password }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Login gagal');
 
       if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
       login(payload.user);
-      router.push(payload.user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard');
+      const targetUrl = payload.redirectUrl || (payload.user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard');
+      router.replace(targetUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login gagal');
     } finally {
@@ -87,23 +87,6 @@ export function LoginView() {
                 placeholder="admin@store.com"
                 className="w-full pl-11 pr-4 py-3.5 bg-slate-950/40 border border-slate-800 focus:border-blue-500 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-slate-200 placeholder:text-slate-650"
                 required
-              />
-            </div>
-          </div>
-
-          {/* Tenant field */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block pl-1">
-              Kode Tenant (opsional untuk Super Admin)
-            </label>
-            <div className="relative">
-              <Building2 size={16} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-500" />
-              <input
-                type="text"
-                value={tenantSlug}
-                onChange={(event) => setTenantSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                placeholder="contoh: restoflow"
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-950/40 border border-slate-800 focus:border-blue-500 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-slate-200 placeholder:text-slate-650"
               />
             </div>
           </div>
