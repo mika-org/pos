@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Building2, Plus, ShieldCheck, Store, Users, Package, ReceiptText, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ChangePasswordForm } from '@/components/auth/ChangePasswordForm';
 import { useAuthStore } from '@/stores/authStore';
 
 interface TenantRow {
@@ -13,6 +14,7 @@ interface TenantRow {
   storeName: string;
   xenditEnabled: boolean;
   xenditConfigured: boolean;
+  admins: { id: string; name: string; email: string }[];
   counts: { users: number; products: number; transactions: number; customerOrders: number };
 }
 
@@ -24,6 +26,8 @@ export default function TenantsPage() {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [adminPasswords, setAdminPasswords] = useState<Record<string, string>>({});
+  const [resettingAdminId, setResettingAdminId] = useState<string | null>(null);
 
   const loadTenants = useCallback(async () => {
     const response = await fetch('/api/super-admin/tenants', { cache: 'no-store' });
@@ -67,6 +71,30 @@ export default function TenantsPage() {
     }
   };
 
+  const resetAdminPassword = async (tenantId: string, adminId: string) => {
+    const newPassword = adminPasswords[adminId] || '';
+    if (newPassword.length < 10) {
+      toast.error('Password admin minimal 10 karakter');
+      return;
+    }
+    setResettingAdminId(adminId);
+    try {
+      const response = await fetch('/api/super-admin/tenants', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_admin_password', tenantId, adminId, newPassword }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Gagal mereset password admin');
+      setAdminPasswords((current) => ({ ...current, [adminId]: '' }));
+      toast.success('Password admin tenant berhasil diubah');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal mereset password admin');
+    } finally {
+      setResettingAdminId(null);
+    }
+  };
+
   if (user?.role !== 'super_admin') return <div className="p-6 text-rose-600">Akses khusus Super Admin.</div>;
 
   return (
@@ -79,6 +107,8 @@ export default function TenantsPage() {
         </div>
       </div>
 
+      <ChangePasswordForm />
+
       <form onSubmit={createTenant} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex items-center gap-2 font-bold text-slate-800"><Plus size={18} /> Tenant Baru</div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -86,7 +116,7 @@ export default function TenantsPage() {
           <input required placeholder="kode-tenant" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} className="px-3 py-2.5 border rounded-xl" />
           <input required placeholder="Nama admin" value={form.adminName} onChange={(e) => setForm({ ...form, adminName: e.target.value })} className="px-3 py-2.5 border rounded-xl" />
           <input required type="email" placeholder="Email admin" value={form.adminEmail} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} className="px-3 py-2.5 border rounded-xl" />
-          <input required minLength={10} type="password" placeholder="Password admin" value={form.adminPassword} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} className="px-3 py-2.5 border rounded-xl" />
+          <input required minLength={10} maxLength={72} type="password" autoComplete="new-password" placeholder="Password admin" value={form.adminPassword} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} className="px-3 py-2.5 border rounded-xl" />
         </div>
         <button disabled={saving} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold disabled:opacity-50">
           {saving ? 'Membuat...' : 'Buat Tenant + Admin'}
@@ -114,6 +144,39 @@ export default function TenantsPage() {
                 <Metric icon={<Package size={15} />} value={tenant.counts.products} label="Produk" />
                 <Metric icon={<ReceiptText size={15} />} value={tenant.counts.transactions} label="Transaksi" />
                 <Metric icon={<Store size={15} />} value={tenant.counts.customerOrders} label="Pesanan" />
+              </div>
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-400">Admin Tenant</p>
+                {tenant.admins.length === 0 ? (
+                  <p className="text-xs text-amber-600">Belum ada akun admin aktif.</p>
+                ) : tenant.admins.map((admin) => (
+                  <div key={admin.id} className="rounded-xl bg-slate-50 p-3 space-y-2">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{admin.name}</p>
+                      <p className="text-xs text-slate-500">{admin.email}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        minLength={10}
+                        maxLength={72}
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Password baru admin"
+                        value={adminPasswords[admin.id] || ''}
+                        onChange={(event) => setAdminPasswords((current) => ({ ...current, [admin.id]: event.target.value }))}
+                        className="min-w-0 flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={resettingAdminId === admin.id}
+                        onClick={() => void resetAdminPassword(tenant.id, admin.id)}
+                        className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-bold disabled:opacity-50"
+                      >
+                        {resettingAdminId === admin.id ? 'Menyimpan...' : 'Reset Password'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
               <div className="text-xs text-slate-500 flex justify-between border-t pt-3">
                 <span>{tenant.storeName}</span>

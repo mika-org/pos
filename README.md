@@ -1,6 +1,6 @@
-# ViorePos - Smart & Premium Point of Sale
+# Viore Pos - Smart & Premium Point of Sale
 
-ViorePos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, serta mendukung integrasi **DOKU Payment Gateway** dan **Xendit**.
+Viore Pos adalah sistem Point of Sale (POS) modern, berperforma tinggi, dan multi-tenant yang dirancang untuk pengalaman makan premium dan alur kerja restoran. Dibangun menggunakan **Next.js**, **PostgreSQL**, **Prisma**, **Zustand**, **Tailwind CSS v4**, **Shadcn UI**, serta mendukung integrasi **DOKU Payment Gateway** dan **Xendit**.
 
 ---
 
@@ -84,7 +84,7 @@ DOKU_IS_PRODUCTION=true
 | `npm run db:generate` | Generate Prisma Client |
 | `npm run db:migrate` | Terapkan migration Prisma yang belum dijalankan |
 | `npm run db:seed` | Seed tenant awal, Super Admin, admin tenant, kategori, produk, meja, dan settings |
-| `npm run db:verify` | Verifikasi migration, jumlah seed, dan hash kredensial pada database target |
+| `npm run db:verify` | Verifikasi migration, jumlah seed, dan format hash BCrypt pada database target |
 | `npm run migrate:supabase:dry` | Hitung row Supabase tanpa menulis PostgreSQL |
 | `npm run migrate:supabase` | Import seluruh tabel dan file Base64/Storage Supabase secara idempotent |
 
@@ -113,9 +113,19 @@ npm run dev:3200
 ```
 
 Akses aplikasi di browser melalui:
-- Panel Kasir/Admin: [http://localhost:3200/dashboard](http://localhost:3200/dashboard)
-- Super Admin: [http://localhost:3200/super-admin/tenants](http://localhost:3200/super-admin/tenants)
-- Halaman Order Meja: [http://localhost:3200/order?table=meja_01&tenant=restoflow](http://localhost:3200/order?table=meja_01&tenant=restoflow)
+- Panel Kasir/Admin: [http://localhost:3000/dashboard](http://localhost:3000/dashboard) (atau port 3200)
+- Super Admin: [http://localhost:3000/super-admin/tenants](http://localhost:3000/super-admin/tenants)
+- Halaman Order Meja: [http://localhost:3000/order?table=meja_01&tenant=restoflow](http://localhost:3000/order?table=meja_01&tenant=restoflow)
+
+Kredensial awal mengikuti `SUPER_ADMIN_*` dan `TENANT_ADMIN_*` pada environment saat seed dijalankan.
+
+Password Super Admin dan admin tenant dapat diubah dari aplikasi. Deploy mempertahankan hash BCrypt valid yang sudah tersimpan di database; `db:sync-admin-credentials` memakai password `.env` hanya untuk akun baru atau hash lama yang tidak valid. Untuk pemulihan darurat dari nilai `.env`, jalankan sekali dengan `SYNC_ADMIN_PASSWORDS=true`.
+
+### Environment deployment VPS
+
+Workflow menggunakan file `/var/www/html/pos/.env` yang tersimpan langsung di VPS. File tersebut wajib berisi koneksi database, secret sesi/enkripsi, slug tenant awal, serta kredensial Super Admin dan admin tenant. Next.js dan Prisma memuat `.env` secara otomatis saat build, migration, dan startup; nilainya tidak perlu disalin ke GitHub Actions secrets.
+
+File `.env` tetap diabaikan Git, tidak terhapus oleh `git pull` atau `npm ci`, dan sebaiknya dibatasi dengan permission `600`. Workflow memeriksa keberadaan file, memvalidasi environment, menjalankan production build dan migration, menyinkronkan hash kredensial admin dari `.env`, lalu me-restart PM2.
 
 ---
 

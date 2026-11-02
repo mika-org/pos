@@ -618,7 +618,7 @@ function CustomerOrderFormContent() {
             V
           </div>
           <div>
-            <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">ViorePos</h1>
+            <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">Viore Pos</h1>
             <p className="text-[10px] text-slate-400 font-extrabold tracking-wider mt-1 uppercase">{t('orderFormTitle')}</p>
           </div>
         </div>
