@@ -148,7 +148,7 @@ export default function HistoryPage() {
           <p className="text-slate-500 text-sm">Lihat dan cetak ulang struk transaksi sebelumnya.</p>
         </div>
         
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
@@ -316,7 +316,7 @@ export default function HistoryPage() {
       {/* Detail & Receipt Modal */}
       {isDetailModalOpen && selectedTx && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:bg-white print:p-0">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col print:shadow-none print:w-full print:max-w-none print:rounded-none">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col print:shadow-none print:w-full print:max-w-none print:rounded-none">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 print:hidden">
               <h2 className="text-lg font-bold text-slate-800">Detail Transaksi</h2>
               <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:bg-slate-200 p-2 rounded-full transition-colors">

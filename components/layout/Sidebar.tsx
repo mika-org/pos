@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { 
   LayoutDashboard, ShoppingCart, Users, Package, FileText, Settings, 
-  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight, Building2
+  History, Tag, LogOut, ClipboardList, QrCode, ChevronLeft, ChevronRight, Building2, X
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/stores/languageStore';
@@ -113,9 +113,19 @@ export function Sidebar() {
             </div>
           )}
           
+          {/* Mobile close button */}
+          <button 
+            onClick={() => setSidebarMobileOpen(false)}
+            className="md:hidden p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            title="Tutup Menu"
+          >
+            <X size={18} />
+          </button>
+
+          {/* Desktop collapse toggle button */}
           <button 
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-850 text-slate-400 hover:text-white transition-colors cursor-pointer select-none"
+            className="hidden md:flex p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-850 text-slate-400 hover:text-white transition-colors cursor-pointer select-none"
             title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}

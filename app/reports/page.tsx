@@ -243,7 +243,7 @@ export default function ReportsPage() {
           <p className="text-slate-500 text-sm">Lihat ringkasan dan unduh data transaksi.</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm w-full md:w-auto">
           <DateRangeFilter
             startDate={startDate}
             endDate={endDate}
@@ -272,7 +272,7 @@ export default function ReportsPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex flex-col">
           <div className="flex items-center space-x-3 mb-2 text-slate-500">
             <TrendingUp size={18} className="text-blue-500" />

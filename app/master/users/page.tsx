@@ -158,7 +158,7 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Manajemen Pengguna</h1>
           <p className="text-slate-500 text-sm">Kelola akun Admin dan Kasir</p>
@@ -174,7 +174,7 @@ export default function UsersPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
@@ -256,14 +256,14 @@ export default function UsersPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h2 className="text-xl font-bold text-slate-800">
                 {editingId ? 'Edit Pengguna' : 'Tambah Pengguna'}
               </h2>
             </div>
             
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-6 space-y-4 flex-1 overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Nama Lengkap</label>
                 <div className="relative">

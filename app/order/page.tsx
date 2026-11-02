@@ -59,7 +59,7 @@ function CustomerOrderFormContent() {
     status?: string;
     error?: string;
   }>({ loading: false });
-  const tenantSlug = searchParams.get('tenant') || process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || '';
+  const tenantSlug = searchParams.get('tenant') || process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || 'restoflow';
   const callbackStatus = searchParams.get('status');
   const callbackOrderId = searchParams.get('orderId');
 

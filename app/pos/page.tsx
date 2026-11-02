@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Product, Category, Transaction, TransactionItem } from '@/lib/db';
+import { Product, Category, Customer, Transaction, TransactionItem } from '@/lib/db';
 import { usePOSStore } from '@/stores/posStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Receipt } from '@/components/pos/Receipt';
 import { supabase } from '@/lib/supabase';
-import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode, ExternalLink } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, Banknote, Scan, X, QrCode, ExternalLink, Check } from 'lucide-react';
 
 export default function POSPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [completedTransaction, setCompletedTransaction] = useState<{tx: Transaction, items: TransactionItem[]} | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -26,11 +28,14 @@ export default function POSPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Store actions
-  const { cart, addToCart, removeFromCart, updateQty, getSubtotal, getTotal, clearCart } = usePOSStore();
+  const { cart, addToCart, removeFromCart, updateQty, getSubtotal, getTotal, clearCart, customerId, setCustomer } = usePOSStore();
 
-  const finalTotal = getTotal() + (getTotal() * (settings.taxPercentage / 100));
+  const taxAmount = Math.round(getTotal() * (settings.taxPercentage / 100));
+  const finalTotal = getTotal() + taxAmount;
+  const selectedCustomer = customers.find(c => c.id === customerId);
 
   useEffect(() => {
     if (!isPaymentModalOpen || paymentMethod !== 'QRIS') return;
@@ -65,16 +70,19 @@ export default function POSPage() {
 
   const fetchMasterData = async () => {
     try {
-      const [categoriesRes, productsRes] = await Promise.all([
+      const [categoriesRes, productsRes, customersRes] = await Promise.all([
         supabase.from('categories').select('*').eq('deleted', false),
-        supabase.from('products').select('*').eq('deleted', false)
+        supabase.from('products').select('*').eq('deleted', false),
+        supabase.from('customers').select('*').eq('deleted', false)
       ]);
 
       if (categoriesRes.error) console.error(categoriesRes.error);
       if (productsRes.error) console.error(productsRes.error);
+      if (customersRes.error) console.error(customersRes.error);
 
       setCategories(categoriesRes.data || []);
       setAllProducts(productsRes.data || []);
+      setCustomers(customersRes.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -91,6 +99,11 @@ export default function POSPage() {
     const matchesCategory = activeCategory ? p.categoryId === activeCategory : true;
     return matchesSearch && matchesCategory;
   }) || [];
+
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    (c.phone && c.phone.includes(customerSearchQuery))
+  );
 
   // Barcode Scanner Listener
   useEffect(() => {
@@ -129,7 +142,6 @@ export default function POSPage() {
         if (matchedProduct) {
           addToCart(matchedProduct);
         } else {
-          // Play a buzzer sound or show toast for not found
           console.log('Barcode not found:', barcodeBuffer);
         }
         barcodeBuffer = '';
@@ -145,19 +157,18 @@ export default function POSPage() {
   }, [allProducts, addToCart, searchQuery]);
 
   const handleCheckout = async () => {
-    // Calculate final total with tax
     const subtotalWithDiscount = getTotal();
-    const taxAmount = subtotalWithDiscount * (settings.taxPercentage / 100);
-    const finalTotal = subtotalWithDiscount + taxAmount;
+    const calculatedTax = Math.round(subtotalWithDiscount * (settings.taxPercentage / 100));
+    const calculatedTotal = subtotalWithDiscount + calculatedTax;
     
     const dynamicQris = paymentMethod === 'QRIS' && (qrisCheckout.mode === 'xendit' || qrisCheckout.mode === 'doku');
     if (dynamicQris && qrisCheckout.status !== 'SUCCEEDED') {
-      alert('Pembayaran Xendit belum diterima.');
+      alert(`Pembayaran ${qrisCheckout.mode === 'doku' ? 'DOKU' : 'Xendit'} belum diterima.`);
       return;
     }
-    const paid = dynamicQris ? finalTotal : Number(amountPaid);
+    const paid = dynamicQris ? calculatedTotal : Number(amountPaid);
     
-    if (paid < finalTotal) {
+    if (paid < calculatedTotal) {
       alert('Uang pembayaran kurang!');
       return;
     }
@@ -168,13 +179,15 @@ export default function POSPage() {
         id: txId,
         no: `TRX-${Date.now()}`,
         date: new Date().toISOString(),
+        customerId: usePOSStore.getState().customerId || undefined,
+        note: usePOSStore.getState().note || undefined,
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
-        tax: taxAmount,
-        total: finalTotal,
+        tax: calculatedTax,
+        total: calculatedTotal,
         paymentMethod: paymentMethod,
         amountPaid: paid,
-        change: paid - finalTotal,
+        change: paid - calculatedTotal,
         status: 'completed',
         userId: user?.id,
         createdAt: new Date().toISOString(),
@@ -223,7 +236,7 @@ export default function POSPage() {
       await fetchMasterData();
     } catch (error) {
       console.error('Checkout failed:', error);
-      alert('Terjadi kesalahan saat memproses transaksi');
+      alert(error instanceof Error ? error.message : 'Terjadi kesalahan saat memproses transaksi');
     }
   };
 
@@ -236,6 +249,8 @@ export default function POSPage() {
         id: txId,
         no: `HLD-${Date.now()}`,
         date: new Date().toISOString(),
+        customerId: usePOSStore.getState().customerId || undefined,
+        note: usePOSStore.getState().note || undefined,
         subtotal: getSubtotal(),
         discount: usePOSStore.getState().globalDiscount,
         tax: 0,
@@ -275,7 +290,7 @@ export default function POSPage() {
       await fetchMasterData();
     } catch (error) {
       console.error('Hold bill failed:', error);
-      alert('Gagal hold transaksi');
+      alert(error instanceof Error ? error.message : 'Gagal hold transaksi');
     }
   };
 
@@ -422,13 +437,36 @@ export default function POSPage() {
 
         {/* Customer Select */}
         <div className="p-3 border-b border-slate-100">
-          <button className="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center">
-              <User size={16} className="mr-2 text-slate-400" />
-              <span>Pilih Customer (Opsional)</span>
-            </div>
-            <Plus size={16} className="text-blue-500" />
-          </button>
+          <div className="flex items-center justify-between p-2 rounded-lg border border-slate-200 text-sm text-slate-600 bg-white">
+            <button 
+              type="button"
+              onClick={() => setIsCustomerModalOpen(true)}
+              className="flex-1 flex items-center text-left hover:text-blue-600 transition-colors"
+            >
+              <User size={16} className="mr-2 text-slate-400 shrink-0" />
+              <span className="truncate font-medium">
+                {selectedCustomer ? selectedCustomer.name : 'Pilih Customer (Opsional)'}
+              </span>
+            </button>
+            {selectedCustomer ? (
+              <button 
+                type="button"
+                onClick={() => setCustomer(null)}
+                className="text-slate-400 hover:text-rose-500 p-1"
+                title="Hapus Customer"
+              >
+                <X size={14} />
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="text-blue-500 hover:text-blue-700 p-1"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Cart Items */}
@@ -492,7 +530,7 @@ export default function POSPage() {
             </div>
             <div className="flex justify-between text-sm text-slate-500">
               <span>Pajak ({settings.taxPercentage}%)</span>
-              <span>Rp {(getTotal() * (settings.taxPercentage / 100)).toLocaleString('id-ID')}</span>
+              <span>Rp {taxAmount.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
               <span className="text-slate-800 font-bold">Total</span>
@@ -526,6 +564,75 @@ export default function POSPage() {
           </div>
         </div>
       </div>
+
+      {/* Customer Selection Modal */}
+      {isCustomerModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-base font-bold text-slate-800">Pilih Pelanggan</h2>
+              <button 
+                onClick={() => setIsCustomerModalOpen(false)}
+                className="text-slate-400 hover:bg-slate-200 p-1.5 rounded-full transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  placeholder="Cari nama atau no telp customer..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-1.5 divide-y divide-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomer(null);
+                    setIsCustomerModalOpen(false);
+                  }}
+                  className={`w-full text-left p-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                    !customerId ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span>Tanpa Customer (Pelanggan Umum)</span>
+                  {!customerId && <Check size={16} className="text-blue-600" />}
+                </button>
+
+                {filteredCustomers.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setCustomer(c.id || null);
+                      setIsCustomerModalOpen(false);
+                    }}
+                    className={`w-full text-left p-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                      customerId === c.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <p className="font-medium text-slate-800">{c.name}</p>
+                      {c.phone && <p className="text-xs text-slate-400">{c.phone}</p>}
+                    </div>
+                    {customerId === c.id && <Check size={16} className="text-blue-600" />}
+                  </button>
+                ))}
+
+                {filteredCustomers.length === 0 && customerSearchQuery && (
+                  <p className="text-center py-4 text-xs text-slate-400">Tidak ada customer cocok</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Modal */}
       {isPaymentModalOpen && (
@@ -604,8 +711,9 @@ export default function POSPage() {
                         Pindai Kode QRIS Toko
                       </span>
                       <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
-                          src={qrisCheckout.qrImage}
+                          src={qrisCheckout.qrImage} 
                           alt="QRIS QR Code" 
                           className="w-48 h-48 object-contain"
                         />
@@ -707,7 +815,7 @@ export default function POSPage() {
               <button 
                 type="button"
                 onClick={handleCheckout}
-                disabled={(paymentMethod === 'QRIS' && qrisCheckout.mode === 'xendit') ? qrisCheckout.status !== 'SUCCEEDED' : Number(amountPaid) < finalTotal}
+                disabled={(paymentMethod === 'QRIS' && (qrisCheckout.mode === 'xendit' || qrisCheckout.mode === 'doku')) ? qrisCheckout.status !== 'SUCCEEDED' : Number(amountPaid) < finalTotal}
                 className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Selesaikan Pembayaran

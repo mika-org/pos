@@ -16,13 +16,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Email, password, atau tenant tidak valid' }, { status: 400 });
   }
 
+  const requestedSlug = parsed.data.tenantSlug || process.env.DEFAULT_TENANT_SLUG;
   const user = await prisma.user.findFirst({
     where: {
       email: parsed.data.email,
       deleted: false,
-      ...(parsed.data.tenantSlug
-        ? { OR: [{ role: 'super_admin' }, { tenant: { slug: parsed.data.tenantSlug } }] }
-        : { role: 'super_admin' }),
+      ...(requestedSlug
+        ? { OR: [{ role: 'super_admin' }, { tenant: { slug: requestedSlug } }] }
+        : {}),
     },
     include: { tenant: { select: { id: true, slug: true, name: true, status: true } } },
   });

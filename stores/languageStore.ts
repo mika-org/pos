@@ -30,7 +30,8 @@ export function useTranslation() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Default to 'id' during SSR
@@ -49,7 +50,6 @@ export function useTranslation() {
   return {
     t,
     language: activeLang,
-    setLanguage,
-    isMounted: mounted,
+    setLanguage
   };
 }

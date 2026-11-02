@@ -65,18 +65,26 @@ export function Header() {
   }, [userRole]);
 
   return (
-    <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-6 transition-all duration-300">
-      <div className="flex items-center space-x-3">
+    <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 transition-all duration-300 shrink-0">
+      <div className="flex items-center space-x-2.5">
         {/* Mobile Hamburger menu */}
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={toggleSidebarMobile}
           className="md:hidden text-slate-600 hover:bg-slate-100 rounded-xl"
-          title="Open Menu"
+          title="Buka Menu"
         >
           <Menu size={20} />
         </Button>
+
+        {/* Mobile App Title */}
+        <div className="flex items-center space-x-1.5 md:hidden">
+          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xs">
+            V
+          </div>
+          <span className="font-black text-slate-800 text-sm">ViorePos</span>
+        </div>
 
         {/* Search bar, hidden on mobile */}
         <div className="hidden md:flex items-center bg-slate-100 rounded-full px-4 py-2 w-80 lg:w-96 focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-white transition-all">
@@ -89,9 +97,9 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
-        {/* Connection Status */}
-        <div className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Connection Status - hidden on small mobile to avoid congestion */}
+        <div className={`hidden sm:flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
           {isOnline ? (
             <>
               <Wifi size={14} className="mr-1.5" />
@@ -108,8 +116,8 @@ export function Header() {
         {/* Language Selector (Dropdown) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center space-x-1.5 select-none font-semibold text-slate-750 border-slate-200">
-              <Languages size={15} />
+            <Button variant="outline" size="sm" className="flex items-center space-x-1.5 select-none font-semibold text-slate-750 border-slate-200 text-xs px-2.5 sm:px-3">
+              <Languages size={14} />
               <span>{language === 'id' ? 'ID' : 'EN'}</span>
             </Button>
           </DropdownMenuTrigger>

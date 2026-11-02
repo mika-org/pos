@@ -14,6 +14,7 @@ const OrderSchema = z.object({
   paymentMethod: z.enum(['qris', 'bank_transfer', 'cashier']),
   paymentProof: z.string().max(22_000_000).optional(),
   xenditPaymentRequestId: z.string().max(200).optional(),
+  notes: z.string().max(500).nullable().optional(),
   items: z.array(z.object({ productId: z.string(), quantity: z.number().int().min(1).max(100) })).min(1).max(100),
 });
 
@@ -70,19 +71,32 @@ export async function POST(request: NextRequest) {
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.customerOrder.create({
         data: {
-          tenantId: context.tenantId!, id: input.orderId, customerName: input.customerName,
-          customerEmail: input.customerEmail.toLowerCase(), totalAmount: total,
-          paymentMethod: input.paymentMethod, paymentProof, paymentStatus,
+          tenantId: context.tenantId!,
+          id: input.orderId,
+          customerName: input.customerName,
+          customerEmail: input.customerEmail.toLowerCase(),
+          totalAmount: total,
+          paymentMethod: input.paymentMethod,
+          paymentProof,
+          paymentStatus,
           xenditPaymentRequestId: input.xenditPaymentRequestId || null,
-          status: 'pending_confirmation', tableId: input.tableId, createdAt: now, updatedAt: now,
+          status: 'pending_confirmation',
+          notes: input.notes || null,
+          tableId: input.tableId,
+          createdAt: now,
+          updatedAt: now,
         },
       });
       for (const item of input.items) {
         const product = productMap.get(item.productId)!;
         await tx.customerOrderItem.create({
           data: {
-            tenantId: context.tenantId!, id: `${input.orderId}-${item.productId}`, orderId: input.orderId,
-            productId: item.productId, quantity: BigInt(item.quantity), price: product.sellPrice,
+            tenantId: context.tenantId!,
+            id: `${input.orderId}-${item.productId}`,
+            orderId: input.orderId,
+            productId: item.productId,
+            quantity: BigInt(item.quantity),
+            price: product.sellPrice,
             subtotal: product.sellPrice * BigInt(item.quantity),
           },
         });

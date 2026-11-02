@@ -323,7 +323,7 @@ export default function Dashboard() {
       </div>
       
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Card 1: Today's Revenue */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex items-center space-x-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-55 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">

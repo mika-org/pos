@@ -109,7 +109,7 @@ export default function TenantsPage() {
                   <Power size={13} /> {tenant.status === 'active' ? 'Aktif' : 'Ditangguhkan'}
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <Metric icon={<Users size={15} />} value={tenant.counts.users} label="User" />
                 <Metric icon={<Package size={15} />} value={tenant.counts.products} label="Produk" />
                 <Metric icon={<ReceiptText size={15} />} value={tenant.counts.transactions} label="Transaksi" />

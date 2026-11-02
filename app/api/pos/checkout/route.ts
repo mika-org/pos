@@ -15,11 +15,20 @@ const CheckoutSchema = z.object({
   paymentReferenceId: z.string().min(3).max(100).optional(),
   xenditPaymentRequestId: z.string().min(3).max(200).optional(),
   transaction: z.object({
-    id: z.string().min(1), no: z.string().min(1), date: z.number().int(), customerId: z.string().nullable().optional(),
-    discount: z.number().min(0), paymentMethod: z.string(), amountPaid: z.number().min(0), note: z.string().nullable().optional(),
+    id: z.string().min(1),
+    no: z.string().min(1),
+    date: z.union([z.number(), z.string()]).optional(),
+    customerId: z.string().nullable().optional(),
+    discount: z.number().min(0).default(0),
+    paymentMethod: z.string(),
+    amountPaid: z.number().min(0).default(0),
+    note: z.string().nullable().optional(),
   }),
   items: z.array(z.object({
-    id: z.string().min(1), productId: z.string().min(1), qty: z.number().int().min(1), discount: z.number().min(0),
+    id: z.string().min(1),
+    productId: z.string().min(1),
+    qty: z.number().int().min(1),
+    discount: z.number().min(0).default(0),
   })).min(1).max(200),
 });
 
@@ -83,26 +92,49 @@ export async function POST(request: NextRequest) {
     )) {
       return NextResponse.json({ error: 'Pembayaran Xendit belum diterima' }, { status: 409 });
     }
+    if (attempt.mode === 'doku' && attempt.status !== 'SUCCEEDED') {
+      return NextResponse.json({ error: 'Pembayaran DOKU belum diterima' }, { status: 409 });
+    }
   }
   const now = new Date();
+  const rawDate = transaction.date ? new Date(transaction.date) : now;
+  const txDate = isNaN(rawDate.getTime()) ? now : rawDate;
 
   try {
     await prisma.$transaction(async (tx) => {
       await tx.transaction.create({
         data: {
-          tenantId, id: transaction.id, no: transaction.no, date: transaction.date ? new Date(transaction.date) : now,
-          customerId: transaction.customerId || null, subtotal, discount: globalDiscount, tax, total,
-          paymentMethod: hold ? '-' : transaction.paymentMethod, amountPaid: hold ? BigInt(0) : amountPaid,
-          change: hold ? BigInt(0) : amountPaid - total, note: transaction.note || null,
-          status: hold ? 'hold' : 'completed', userId: context.session!.userId, createdAt: now, updatedAt: now,
+          tenantId,
+          id: transaction.id,
+          no: transaction.no,
+          date: txDate,
+          customerId: transaction.customerId || null,
+          subtotal,
+          discount: globalDiscount,
+          tax,
+          total,
+          paymentMethod: hold ? '-' : transaction.paymentMethod,
+          amountPaid: hold ? BigInt(0) : amountPaid,
+          change: hold ? BigInt(0) : (amountPaid > total ? amountPaid - total : BigInt(0)),
+          note: transaction.note || null,
+          status: hold ? 'hold' : 'completed',
+          userId: context.session!.userId,
+          createdAt: now,
+          updatedAt: now,
         },
       });
       for (const item of normalizedItems) {
         await tx.transactionItem.create({
           data: {
-            tenantId, id: item.id, transactionId: transaction.id, productId: item.productId,
-            productName: item.product.name, price: item.product.sellPrice, qty: BigInt(item.qty),
-            discount: item.discount, subtotal: item.subtotal,
+            tenantId,
+            id: item.id,
+            transactionId: transaction.id,
+            productId: item.productId,
+            productName: item.product.name,
+            price: item.product.sellPrice,
+            qty: BigInt(item.qty),
+            discount: item.discount,
+            subtotal: item.subtotal,
           },
         });
         if (!hold) {
@@ -111,6 +143,12 @@ export async function POST(request: NextRequest) {
             data: { stock: { decrement: BigInt(item.qty) }, updatedAt: now },
           });
         }
+      }
+      if (!hold && transaction.paymentMethod === 'QRIS' && paymentReferenceId) {
+        await tx.paymentAttempt.updateMany({
+          where: { tenantId, referenceId: paymentReferenceId },
+          data: { status: 'SUCCEEDED' },
+        });
       }
     });
     return NextResponse.json({ ok: true, totals: { subtotal: Number(subtotal), tax: Number(tax), total: Number(total) } });

@@ -248,7 +248,7 @@ export default function TablesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">{t('tablesTitle')}</h1>
           <p className="text-sm text-slate-500">{t('tablesSubtitle')}</p>
@@ -265,7 +265,7 @@ export default function TablesPage() {
       {/* Search Input bar */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200/80 flex items-center">
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-72">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <Input 
               type="text" 

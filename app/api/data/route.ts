@@ -32,6 +32,7 @@ const FIELD_MAP: Partial<Record<TableName, Record<string, string>>> = {
     verified_at: 'verifiedAt', table_id: 'tableId', created_at: 'createdAt', updated_at: 'updatedAt',
   },
   customer_order_items: { order_id: 'orderId', product_id: 'productId' },
+  transaction_items: { transaction_id: 'transactionId', product_id: 'productId', product_name: 'productName' },
 };
 
 const BIGINT_FIELDS: Partial<Record<TableName, Set<string>>> = {

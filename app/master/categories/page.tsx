@@ -128,7 +128,7 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Kategori Produk</h1>
           <p className="text-sm text-slate-500">Kelola kategori produk untuk memudahkan pencarian di Kasir</p>
@@ -144,7 +144,7 @@ export default function CategoriesPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex items-center">
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-72">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
@@ -204,7 +204,7 @@ export default function CategoriesPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">
                 {editingId ? 'Edit Kategori' : 'Tambah Kategori'}
@@ -214,7 +214,7 @@ export default function CategoriesPage() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-4">
+            <form onSubmit={handleSubmit} className="p-4 flex-1 overflow-y-auto">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
