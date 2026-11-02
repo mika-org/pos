@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+      <body suppressHydrationWarning className={`${inter.className} bg-slate-50 text-slate-900`}>
         <Toaster position="top-right" />
         <ClientLayout>{children}</ClientLayout>
         {process.env.VERCEL === '1' ? <Analytics /> : null}

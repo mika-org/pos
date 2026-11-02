@@ -9,7 +9,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
   // Public customer order routes (no login required, no sidebar/header)
-  const isPublicRoute = pathname === '/order' || pathname?.startsWith('/order/') || pathname === '/login';
+  const isPublicRoute = pathname === '/' || pathname === '/order' || pathname?.startsWith('/order/') || pathname === '/login';
 
   if (isPublicRoute) {
     return <div className="min-h-screen bg-slate-50 overflow-y-auto">{children}</div>;

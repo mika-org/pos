@@ -6,33 +6,44 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const { isAuthenticated, user, login } = useAuthStore();
+  const { login, logout } = useAuthStore();
   const router = useRouter();
 
-  // If user is already logged in, redirect them back to dashboard / super-admin
+  // Verify server session on mount
   useEffect(() => {
-    if (isAuthenticated && user) {
-      router.replace(user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard');
-      return;
-    }
-
     let cancelled = false;
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+
+    const verifyServerSession = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { cache: 'no-store' });
         if (cancelled) return;
-        if (data?.user) {
-          login(data.user);
-          if (data.user.tenantSlug) localStorage.setItem('pos_tenant_slug', data.user.tenantSlug);
-          router.replace(data.user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard');
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            login(data.user);
+            if (data.user.tenantSlug) localStorage.setItem('pos_tenant_slug', data.user.tenantSlug);
+            const target = data.user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard';
+            router.replace(target);
+            return;
+          }
         }
-      })
-      .catch(() => {});
+
+        // If server session is absent or expired, purge any stale client-side persist state
+        await logout();
+      } catch {
+        if (!cancelled) {
+          await logout();
+        }
+      }
+    };
+
+    void verifyServerSession();
 
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, user, router, login]);
+  }, [router, login, logout]);
 
   return <LoginView />;
 }

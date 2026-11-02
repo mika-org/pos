@@ -61,27 +61,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     const checkAuth = async () => {
-      const response = await fetch('/api/auth/session', { cache: 'no-store' });
-      if (cancelled) return;
-      if (!response.ok) {
-        await logout();
-        router.replace('/login');
-        return;
-      }
-      const payload = await response.json();
-      login(payload.user);
-      if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
-      if (payload.user.role === 'super_admin') {
-        if (!pathname.startsWith('/super-admin')) router.replace('/super-admin/tenants');
-      } else {
-        if (pathname.startsWith('/super-admin')) {
-          router.replace('/dashboard');
+      try {
+        const response = await fetch('/api/auth/session', { cache: 'no-store' });
+        if (cancelled) return;
+        if (!response.ok) {
+          await logout();
+          window.location.replace('/login');
           return;
         }
-        await fetchSettings();
+        const payload = await response.json();
+        if (!payload?.user) {
+          await logout();
+          window.location.replace('/login');
+          return;
+        }
+
+        login(payload.user);
+        if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
+
+        if (payload.user.role === 'super_admin') {
+          if (!pathname.startsWith('/super-admin')) router.replace('/super-admin/tenants');
+        } else {
+          if (pathname.startsWith('/super-admin')) {
+            router.replace('/dashboard');
+            return;
+          }
+          await fetchSettings();
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+        if (!cancelled) {
+          await logout();
+          window.location.replace('/login');
+        }
       }
     };
+
     void checkAuth();
+
     return () => {
       cancelled = true;
       window.clearTimeout(mountedTimer);
@@ -156,6 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white space-y-4">
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p className="font-semibold text-sm">Mengalihkan ke halaman login...</p>
+        <button
+          onClick={() => { window.location.replace('/login'); }}
+          className="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer mt-2"
+        >
+          Klik di sini jika tidak beralih otomatis
+        </button>
       </div>
     );
   }

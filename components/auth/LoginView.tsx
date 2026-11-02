@@ -31,7 +31,7 @@ export function LoginView() {
       if (payload.user.tenantSlug) localStorage.setItem('pos_tenant_slug', payload.user.tenantSlug);
       login(payload.user);
       const targetUrl = payload.redirectUrl || (payload.user.role === 'super_admin' ? '/super-admin/tenants' : '/dashboard');
-      router.replace(targetUrl);
+      window.location.replace(targetUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login gagal');
     } finally {

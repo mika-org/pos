@@ -38,8 +38,8 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
-    router.refresh();
+    window.location.replace('/login');
+
   };
 
   const isActive = (href: string) => {

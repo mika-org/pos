@@ -39,8 +39,8 @@ export function ChangePasswordForm() {
       setForm(initialForm);
       toast.success('Password berhasil diubah. Silakan masuk kembali.');
       await logout();
-      router.replace('/login');
-      router.refresh();
+      window.location.replace('/login');
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal mengubah password');
     } finally {

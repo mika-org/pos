@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const BASE_URL = 'http://localhost:3200';
+const BASE_URL = process.env.TEST_URL || 'http://localhost:3000';
 const prisma = new PrismaClient();
 
 async function runE2E() {
@@ -190,8 +190,81 @@ async function runE2E() {
     const publicOrderData = await publicOrderRes.json();
     assert(publicOrderRes.ok && publicOrderData.order?.id === publicOrderId, `Public Order created: ${publicOrderData.order?.id}`);
 
-    // 7. Cleanup
-    console.log('\n--- 7. Cleanup E2E Records ---');
+    // 7. Test Super Admin Login and Access
+    console.log('\n--- 7. Testing Super Admin Auth & Endpoints ---');
+    const superLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: process.env.SUPER_ADMIN_EMAIL,
+        password: process.env.SUPER_ADMIN_PASSWORD,
+      }),
+    });
+    const superLoginData = await superLoginRes.json();
+    assert(superLoginRes.ok && superLoginData.user?.role === 'super_admin', 'Super Admin login succeeds with super_admin role');
+
+    const superCookieHeader = superLoginRes.headers.get('set-cookie');
+    const superSessionCookie = superCookieHeader ? superCookieHeader.split(';')[0] : '';
+    assert(superSessionCookie.includes('pos_session='), 'Super admin pos_session cookie received');
+
+    const tenantsRes = await fetch(`${BASE_URL}/api/super-admin/tenants`, {
+      headers: { Cookie: superSessionCookie },
+    });
+    const tenantsData = await tenantsRes.json();
+    assert(tenantsRes.ok && Array.isArray(tenantsData.tenants), `Super admin can list tenants (found ${tenantsData.tenants?.length})`);
+
+    // Verify Tenant Admin cannot access Super Admin endpoint
+    const forbiddenRes = await fetch(`${BASE_URL}/api/super-admin/tenants`, {
+      headers: { Cookie: sessionCookie },
+    });
+    assert(forbiddenRes.status === 403, 'Tenant admin blocked from /api/super-admin/tenants (HTTP 403)');
+
+    // 8. Test Invalid Credentials
+    console.log('\n--- 8. Testing Invalid Login Credentials ---');
+    const badLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: process.env.SUPER_ADMIN_EMAIL,
+        password: 'wrong_password_123',
+      }),
+    });
+    assert(badLoginRes.status === 401, 'Invalid password rejected with HTTP 401');
+
+    // 9. Test Key UI Pages (HTTP GET)
+    console.log('\n--- 9. Testing Page Route Rendering ---');
+    const pagesToTest = [
+      { path: '/login', cookie: '' },
+      { path: '/order', cookie: '' },
+      { path: '/dashboard', cookie: sessionCookie },
+      { path: '/pos', cookie: sessionCookie },
+      { path: '/history', cookie: sessionCookie },
+      { path: '/reports', cookie: sessionCookie },
+      { path: '/master/products', cookie: sessionCookie },
+      { path: '/master/categories', cookie: sessionCookie },
+      { path: '/master/tables', cookie: sessionCookie },
+      { path: '/orders', cookie: sessionCookie },
+      { path: '/settings', cookie: sessionCookie },
+      { path: '/super-admin/tenants', cookie: superSessionCookie },
+    ];
+
+    for (const page of pagesToTest) {
+      const pageRes = await fetch(`${BASE_URL}${page.path}`, {
+        headers: page.cookie ? { Cookie: page.cookie } : {},
+      });
+      assert(pageRes.status === 200, `Page route ${page.path} returns HTTP 200`);
+    }
+
+    // 10. Test Logout
+    console.log('\n--- 10. Testing Auth Logout ---');
+    const logoutRes = await fetch(`${BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: { Cookie: sessionCookie },
+    });
+    assert(logoutRes.ok, 'Logout endpoint succeeds');
+
+    // 11. Cleanup
+    console.log('\n--- 11. Cleanup E2E Records ---');
     await prisma.transactionItem.deleteMany({ where: { transactionId: { in: [txId, holdTxId] } } });
     await prisma.transaction.deleteMany({ where: { id: { in: [txId, holdTxId] } } });
     await prisma.customerOrderItem.deleteMany({ where: { orderId: publicOrderId } });
